@@ -1,0 +1,18 @@
+{
+  "name": "auto-question-supply",
+  "version": "1.0.0",
+  "private": true,
+  "description": "詞語隨機生成器 - 提供形容詞與名詞自訂儲存，並隨機選取呈現 (形容詞 的 名詞) 組合",
+  "scripts": {
+    "start": "npx serve ."
+  },
+  "keywords": [
+    "word-generator",
+    "adjective",
+    "noun",
+    "vocabulary",
+    "vercel"
+  ],
+  "author": "s411318-abc",
+  "license": "MIT"
+}
