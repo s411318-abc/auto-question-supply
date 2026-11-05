@@ -3,18 +3,7 @@
  * 核心邏輯腳本：支援不重複抽取、抽取池重置、詞庫保存、匯出匯入與批次管理
  */
 
-// 預設精選詞庫
-const SAMPLE_ADJECTIVES = [
-  "快樂", "神秘", "巨大", "溫暖", "優雅", 
-  "勇敢", "閃耀", "懶散", "美味", "天馬行空"
-];
-
-const SAMPLE_NOUNS = [
-  "貓咪", "工程師", "珍珠奶茶", "宇宙飛船", "吉他", 
-  "咖啡豆", "魔法師", "向日葵", "機器人", "演算法"
-];
-
-// 狀態管理
+// 狀態管理 (初始為空詞庫)
 let state = {
   adjectives: [],
   nouns: [],
@@ -52,7 +41,6 @@ const elements = {
   
   btnExportVocab: document.getElementById("btnExportVocab"),
   fileImportVocab: document.getElementById("fileImportVocab"),
-  btnResetVocab: document.getElementById("btnResetVocab"),
   btnClearAll: document.getElementById("btnClearAll"),
   btnClearAdj: document.getElementById("btnClearAdj"),
   btnClearNoun: document.getElementById("btnClearNoun"),
@@ -81,39 +69,36 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 /**
- * 從 LocalStorage 載入資料
+ * 從 LocalStorage 載入資料 (完全無預設詞彙，從零開始)
  */
 function loadData() {
   try {
+    // 遷移檢查：若瀏覽器先前有暫存舊的預設範例內容，在此進行重設清空
+    const MIGRATION_KEY = "rw_defaults_cleared_v2";
+    if (!localStorage.getItem(MIGRATION_KEY)) {
+      localStorage.removeItem("rw_adjectives");
+      localStorage.removeItem("rw_nouns");
+      localStorage.removeItem("rw_drawnCombos");
+      localStorage.setItem(MIGRATION_KEY, "true");
+    }
+
     const savedAdj = localStorage.getItem("rw_adjectives");
     const savedNouns = localStorage.getItem("rw_nouns");
     const savedDrawn = localStorage.getItem("rw_drawnCombos");
     const savedHistory = localStorage.getItem("rw_history");
 
-    if (savedAdj !== null && savedNouns !== null) {
-      state.adjectives = JSON.parse(savedAdj) || [];
-      state.nouns = JSON.parse(savedNouns) || [];
-    } else {
-      // 首次進入載入範例資料
-      state.adjectives = [...SAMPLE_ADJECTIVES];
-      state.nouns = [...SAMPLE_NOUNS];
-    }
-
-    if (savedDrawn) {
-      state.drawnCombos = JSON.parse(savedDrawn) || [];
-    }
-
-    if (savedHistory) {
-      state.history = JSON.parse(savedHistory) || [];
-    }
+    state.adjectives = savedAdj ? (JSON.parse(savedAdj) || []) : [];
+    state.nouns = savedNouns ? (JSON.parse(savedNouns) || []) : [];
+    state.drawnCombos = savedDrawn ? (JSON.parse(savedDrawn) || []) : [];
+    state.history = savedHistory ? (JSON.parse(savedHistory) || []) : [];
 
     // 清理無效組合
     cleanDrawnCombos();
     saveData();
   } catch (e) {
     console.error("載入本機資料失敗:", e);
-    state.adjectives = [...SAMPLE_ADJECTIVES];
-    state.nouns = [...SAMPLE_NOUNS];
+    state.adjectives = [];
+    state.nouns = [];
     state.drawnCombos = [];
   }
 }
@@ -210,17 +195,18 @@ function setupEventListeners() {
   // 匯入詞庫 (載入 JSON)
   elements.fileImportVocab.addEventListener("change", importVocabulary);
 
-  // 重置詞庫為預設範例
-  elements.btnResetVocab.addEventListener("click", resetVocabularyToDefault);
-
   // 全部清空
   elements.btnClearAll.addEventListener("click", () => {
     if (confirm("確定要清空所有儲存的形容詞與名詞嗎？（已抽取的紀錄也會一併清空）")) {
       state.adjectives = [];
       state.nouns = [];
       state.drawnCombos = [];
+      state.currentResult = "";
       saveData();
       renderAll();
+      elements.resultDisplay.innerHTML = `( 請先於下方新增形容詞與名詞 )`;
+      elements.resultDisplay.classList.add("placeholder");
+      elements.btnCopy.disabled = true;
       showToast("已清空所有詞庫", "warning");
     }
   });
@@ -263,6 +249,7 @@ function setupEventListeners() {
     elements.batchModal.style.display = "none";
   });
 
+  elements.btnConfirmBatch.addEventListener("handleConfirmBatch", handleConfirmBatch);
   elements.btnConfirmBatch.addEventListener("click", handleConfirmBatch);
 
   // 歷史紀錄清除
@@ -378,7 +365,7 @@ function handleConfirmBatch() {
  */
 function generateNonRepeatingCombination() {
   if (state.adjectives.length === 0 && state.nouns.length === 0) {
-    showToast("詞庫是空的，請先新增形容詞與名詞！", "error");
+    showToast("目前沒有任何詞彙，請先新增形容詞與名詞！", "error");
     elements.adjInput.focus();
     return;
   }
@@ -401,7 +388,7 @@ function generateNonRepeatingCombination() {
   // 若已經全數抽完
   if (availableCombos.length === 0) {
     showToast("🎉 所有組合已全部抽取完畢！請點擊「重置抽選池」即可重新開始新一輪抽取。", "warning");
-    elements.resultDisplay.innerHTML = `<span style="font-size: 1.15rem; color: #f59e0b;">🎉 所有組合已全部抽完！請點擊下方「重置抽選池」重新開始</span>`;
+    elements.resultDisplay.innerHTML = `<span style="font-size: 1.15rem; color: #f59e0b;">🎉 所有組合已全部抽完！請點擊上方「重置抽選池」重新開始</span>`;
     return;
   }
 
@@ -457,6 +444,11 @@ function generateNonRepeatingCombination() {
  */
 function resetDrawPool() {
   const totalCombos = state.adjectives.length * state.nouns.length;
+  if (totalCombos === 0) {
+    showToast("目前詞庫為空，請先新增詞彙！", "warning");
+    return;
+  }
+
   if (state.drawnCombos.length === 0) {
     showToast("目前抽選池已是全滿狀態，無需重置！", "warning");
     return;
@@ -466,24 +458,6 @@ function resetDrawPool() {
   saveData();
   renderProgress();
   showToast(`已重置抽選池！全數 ${totalCombos} 種組合可重新不重複抽取。`, "success");
-}
-
-/**
- * 重置詞庫為預設範例
- */
-function resetVocabularyToDefault() {
-  if (confirm("確定要將詞庫恢復為系統預設範例嗎？（現有詞彙與抽取進度將會重設）")) {
-    state.adjectives = [...SAMPLE_ADJECTIVES];
-    state.nouns = [...SAMPLE_NOUNS];
-    state.drawnCombos = [];
-    state.currentResult = "";
-    saveData();
-    renderAll();
-    elements.resultDisplay.innerHTML = `( 點擊下方按鈕開始不重複抽取 )`;
-    elements.resultDisplay.classList.add("placeholder");
-    elements.btnCopy.disabled = true;
-    showToast("詞庫與抽選進度已重置為預設範例！", "success");
-  }
 }
 
 /**
@@ -644,7 +618,6 @@ function renderProgress() {
   elements.drawnPercentText.textContent = `${percent}%`;
   elements.drawProgressBar.style.width = `${percent}%`;
 
-  // 顏色變化
   if (percent === 100) {
     elements.drawProgressBar.style.background = "#10b981";
   } else {
