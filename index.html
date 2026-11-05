@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>詞語隨機生成器 | 形容詞 的 名詞</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <header class="header">
+      <div class="logo-icon">✨</div>
+      <h1>詞語隨機生成器</h1>
+      <p class="subtitle">自訂形容詞與名詞庫，一鍵產生驚喜創意組合！</p>
+    </header>
+
+    <!-- Main Output & Generator Action -->
+    <section class="card generator-card">
+      <div class="display-container">
+        <div class="display-label">隨機抽取結果</div>
+        <div id="resultDisplay" class="result-text placeholder">
+          ( 點擊下方按鈕抽取組合 )
+        </div>
+      </div>
+
+      <div class="generator-actions">
+        <button id="btnGenerate" class="btn btn-primary btn-large">
+          <span class="btn-icon">🎲</span> 隨機抽取 (形容詞 的 名詞)
+        </button>
+        <button id="btnCopy" class="btn btn-outline" title="複製結果" disabled>
+          <span class="btn-icon">📋</span> 複製結果
+        </button>
+      </div>
+
+      <!-- Live stats indicator -->
+      <div class="stats-bar">
+        <span>已收錄形容詞：<strong id="adjCountStat">0</strong> 個</span>
+        <span class="divider">•</span>
+        <span>已收錄名詞：<strong id="nounCountStat">0</strong> 個</span>
+        <span class="divider">•</span>
+        <span>潛在組合數：<strong id="comboCountStat">0</strong> 種</span>
+      </div>
+    </section>
+
+    <!-- Word Input & Storage Section -->
+    <section class="card input-card">
+      <h2><span class="section-icon">✏️</span> 新增詞彙</h2>
+      <p class="section-desc">請在下方輸入欲儲存的形容詞與名詞，支援單獨或同時輸入儲存。</p>
+      
+      <form id="wordForm" class="word-form" onsubmit="return false;">
+        <div class="input-grid">
+          <div class="form-group">
+            <label for="adjInput">
+              <span class="tag-badge badge-adj">形容詞</span>
+            </label>
+            <div class="input-wrapper">
+              <input 
+                type="text" 
+                id="adjInput" 
+                placeholder="例如：可愛、神秘、巨大的..." 
+                autocomplete="off"
+              />
+              <button type="button" class="clear-input-btn" id="clearAdjInput" title="清除">&times;</button>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="nounInput">
+              <span class="tag-badge badge-noun">名詞</span>
+            </label>
+            <div class="input-wrapper">
+              <input 
+                type="text" 
+                id="nounInput" 
+                placeholder="例如：貓咪、珍珠奶茶、宇宙..." 
+                autocomplete="off"
+              />
+              <button type="button" class="clear-input-btn" id="clearNounInput" title="清除">&times;</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button type="submit" id="btnSave" class="btn btn-success">
+            <span class="btn-icon">💾</span> 儲存詞彙
+          </button>
+          <span class="hint-text">💡 提示：按鍵盤 Enter 亦可快速儲存</span>
+        </div>
+      </form>
+    </section>
+
+    <!-- Vocabulary Lists Management Section -->
+    <section class="card vocab-card">
+      <div class="vocab-header">
+        <h2><span class="section-icon">📚</span> 詞彙管理庫</h2>
+        <div class="vocab-actions">
+          <button id="btnLoadSample" class="btn btn-sm btn-ghost">
+            <span>💡 載入精選範例</span>
+          </button>
+          <button id="btnClearAll" class="btn btn-sm btn-ghost btn-danger-ghost">
+            <span>🗑️ 全部清空</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="vocab-grid">
+        <!-- Adjectives Column -->
+        <div class="vocab-column">
+          <div class="column-header">
+            <div class="column-title">
+              <span class="indicator indicator-adj"></span>
+              <h3>形容詞清單</h3>
+              <span class="count-pill" id="adjBadge">0</span>
+            </div>
+            <button class="btn-text-danger" id="btnClearAdj" title="清空形容詞">清空</button>
+          </div>
+          <div class="word-pool" id="adjList">
+            <!-- Dynamic tags -->
+          </div>
+        </div>
+
+        <!-- Nouns Column -->
+        <div class="vocab-column">
+          <div class="column-header">
+            <div class="column-title">
+              <span class="indicator indicator-noun"></span>
+              <h3>名詞清單</h3>
+              <span class="count-pill" id="nounBadge">0</span>
+            </div>
+            <button class="btn-text-danger" id="btnClearNoun" title="清空名詞">清空</button>
+          </div>
+          <div class="word-pool" id="nounList">
+            <!-- Dynamic tags -->
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- History Log Section -->
+    <section class="card history-card" id="historySection" style="display: none;">
+      <div class="history-header">
+        <h3><span class="section-icon">🕒</span> 最近抽取紀錄</h3>
+        <button id="btnClearHistory" class="btn-text-danger">清除紀錄</button>
+      </div>
+      <div class="history-list" id="historyList">
+        <!-- Dynamic history items -->
+      </div>
+    </section>
+
+    <footer class="footer">
+      <p>資料皆自動保存在瀏覽器本機儲存空間（Local Storage）中，重新整理或重開網頁都不會遺失。</p>
+    </footer>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toastContainer" class="toast-container"></div>
+
+  <script src="script.js"></script>
+</body>
+</html>
+
