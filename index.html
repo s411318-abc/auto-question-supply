@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="提供形容詞與名詞自訂儲存，並隨機組合呈現 (形容詞 的 名詞) 的線上小工具。">
+  <meta name="description" content="提供形容詞與名詞自訂儲存，並支援不重複隨機組合 (形容詞 的 名詞) 的線上小工具。">
   <meta name="theme-color" content="#6366f1">
   <meta property="og:title" content="詞語隨機生成器 | 形容詞 的 名詞">
-  <meta property="og:description" content="自訂形容詞與名詞庫，一鍵產生驚喜創意組合！">
+  <meta property="og:description" content="自訂形容詞與名詞庫，一鍵產生不重複驚喜創意組合！">
   <meta property="og:type" content="website">
   <title>詞語隨機生成器 | 形容詞 的 名詞</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>✨</text></svg>">
@@ -21,7 +21,7 @@
     <header class="header">
       <div class="logo-icon">✨</div>
       <h1>詞語隨機生成器</h1>
-      <p class="subtitle">自訂形容詞與名詞庫，一鍵產生驚喜創意組合！</p>
+      <p class="subtitle">自訂形容詞與名詞庫・不重複抽取・隨時重置與備份保存</p>
     </header>
 
     <!-- Main Output & Generator Action -->
@@ -29,13 +29,29 @@
       <div class="display-container">
         <div class="display-label">隨機抽取結果</div>
         <div id="resultDisplay" class="result-text placeholder">
-          ( 點擊下方按鈕抽取組合 )
+          ( 點擊下方按鈕開始不重複抽取 )
         </div>
       </div>
 
+      <!-- Draw Progress Bar -->
+      <div class="draw-progress-card">
+        <div class="draw-progress-header">
+          <span class="progress-label">🎲 抽取進度（不重複池）</span>
+          <span class="progress-details" id="drawnProgressText">已抽取 0 / 0 組 (剩餘 0 組)</span>
+          <span class="progress-percent-badge" id="drawnPercentText">0%</span>
+        </div>
+        <div class="progress-track">
+          <div id="drawProgressBar" class="progress-fill" style="width: 0%;"></div>
+        </div>
+      </div>
+
+      <!-- Action buttons -->
       <div class="generator-actions">
         <button id="btnGenerate" class="btn btn-primary btn-large">
-          <span class="btn-icon">🎲</span> 隨機抽取 (形容詞 的 名詞)
+          <span class="btn-icon">🎲</span> 隨機抽取 (不重複)
+        </button>
+        <button id="btnResetPool" class="btn btn-warning" title="清空已抽紀錄，重新開始不重複抽取">
+          <span class="btn-icon">🔄</span> 重置抽選池
         </button>
         <button id="btnCopy" class="btn btn-outline" title="複製結果" disabled>
           <span class="btn-icon">📋</span> 複製結果
@@ -44,18 +60,25 @@
 
       <!-- Live stats indicator -->
       <div class="stats-bar">
-        <span>已收錄形容詞：<strong id="adjCountStat">0</strong> 個</span>
+        <span>形容詞：<strong id="adjCountStat">0</strong> 個</span>
         <span class="divider">•</span>
-        <span>已收錄名詞：<strong id="nounCountStat">0</strong> 個</span>
+        <span>名詞：<strong id="nounCountStat">0</strong> 個</span>
         <span class="divider">•</span>
-        <span>潛在組合數：<strong id="comboCountStat">0</strong> 種</span>
+        <span>總組合數：<strong id="comboCountStat">0</strong> 種</span>
+        <span class="divider">•</span>
+        <span class="status-indicator-tag"><span class="pulse-dot"></span>自動儲存中</span>
       </div>
     </section>
 
     <!-- Word Input & Storage Section -->
     <section class="card input-card">
-      <h2><span class="section-icon">✏️</span> 新增詞彙</h2>
-      <p class="section-desc">請在下方輸入欲儲存的形容詞與名詞，支援單獨或同時輸入儲存。</p>
+      <div class="section-title-bar">
+        <h2><span class="section-icon">✏️</span> 新增與保存詞彙</h2>
+        <button type="button" id="btnOpenBatchModal" class="btn btn-sm btn-ghost">
+          <span>📝 批次輸入多個詞彙</span>
+        </button>
+      </div>
+      <p class="section-desc">在此輸入形容詞或名詞，支援單獨或同時輸入，儲存後立即加入不重複抽選庫中。</p>
       
       <form id="wordForm" class="word-form" onsubmit="return false;">
         <div class="input-grid">
@@ -92,7 +115,7 @@
 
         <div class="form-actions">
           <button type="submit" id="btnSave" class="btn btn-success">
-            <span class="btn-icon">💾</span> 儲存詞彙
+            <span class="btn-icon">💾</span> 儲存至詞庫
           </button>
           <span class="hint-text">💡 提示：按鍵盤 Enter 亦可快速儲存</span>
         </div>
@@ -102,12 +125,20 @@
     <!-- Vocabulary Lists Management Section -->
     <section class="card vocab-card">
       <div class="vocab-header">
-        <h2><span class="section-icon">📚</span> 詞彙管理庫</h2>
+        <h2><span class="section-icon">📚</span> 詞庫管理與保存</h2>
         <div class="vocab-actions">
-          <button id="btnLoadSample" class="btn btn-sm btn-ghost">
-            <span>💡 載入精選範例</span>
+          <!-- Save & Backup actions -->
+          <button id="btnExportVocab" class="btn btn-sm btn-outline-primary" title="下載備份詞庫檔案 (JSON)">
+            <span>💾 匯出保存備份</span>
           </button>
-          <button id="btnClearAll" class="btn btn-sm btn-ghost btn-danger-ghost">
+          <label class="btn btn-sm btn-ghost file-input-label" title="從先前備份的檔案載入">
+            <span>📥 匯入詞庫</span>
+            <input type="file" id="fileImportVocab" accept=".json" style="display: none;">
+          </label>
+          <button id="btnResetVocab" class="btn btn-sm btn-ghost" title="將形容詞與名詞恢復為預設範例">
+            <span>🔄 重置詞庫為預設</span>
+          </button>
+          <button id="btnClearAll" class="btn btn-sm btn-ghost btn-danger-ghost" title="清空全部詞庫">
             <span>🗑️ 全部清空</span>
           </button>
         </div>
@@ -158,8 +189,33 @@
     </section>
 
     <footer class="footer">
-      <p>資料皆自動保存在瀏覽器本機儲存空間（Local Storage）中，重新整理或重開網頁都不會遺失。</p>
+      <p>所有形容詞與名詞均自動保存於瀏覽器 LocalStorage，支援匯出備份 JSON 檔案，重整或更換裝置不丟失。</p>
     </footer>
+  </div>
+
+  <!-- Batch Import Modal -->
+  <div id="batchModal" class="modal-overlay" style="display: none;">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3>📝 批次新增與保存詞彙</h3>
+        <button id="btnCloseBatchModal" class="modal-close-btn">&times;</button>
+      </div>
+      <p class="modal-desc">可直接貼上多個詞彙，支援使用逗號、頓號、空格或換行分隔：</p>
+      <div class="modal-body">
+        <div class="form-group">
+          <label><strong>形容詞清單</strong> (每詞以換行或逗號隔開)：</label>
+          <textarea id="batchAdjInput" rows="4" placeholder="可愛, 神秘, 巨大的, 閃耀的, 溫柔的..."></textarea>
+        </div>
+        <div class="form-group">
+          <label><strong>名詞清單</strong> (每詞以換行或逗號隔開)：</label>
+          <textarea id="batchNounInput" rows="4" placeholder="貓咪, 珍珠奶茶, 宇宙飛船, 工程師, 咖啡豆..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="btnCancelBatch" class="btn btn-ghost">取消</button>
+        <button id="btnConfirmBatch" class="btn btn-success">💾 儲存並加入詞庫</button>
+      </div>
+    </div>
   </div>
 
   <!-- Toast Notification Container -->
@@ -168,4 +224,3 @@
   <script src="script.js"></script>
 </body>
 </html>
-

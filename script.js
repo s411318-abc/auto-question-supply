@@ -1,6 +1,6 @@
 /**
  * 詞語隨機生成器
- * 核心邏輯腳本
+ * 核心邏輯腳本：支援不重複抽取、抽取池重置、詞庫保存、匯出匯入與批次管理
  */
 
 // 預設精選詞庫
@@ -18,6 +18,7 @@ const SAMPLE_NOUNS = [
 let state = {
   adjectives: [],
   nouns: [],
+  drawnCombos: [], // 儲存已抽取的組合字串: "形容詞:::名詞"
   history: [],
   currentResult: ""
 };
@@ -32,8 +33,13 @@ const elements = {
   wordForm: document.getElementById("wordForm"),
   
   btnGenerate: document.getElementById("btnGenerate"),
+  btnResetPool: document.getElementById("btnResetPool"),
   btnCopy: document.getElementById("btnCopy"),
   resultDisplay: document.getElementById("resultDisplay"),
+  
+  drawnProgressText: document.getElementById("drawnProgressText"),
+  drawnPercentText: document.getElementById("drawnPercentText"),
+  drawProgressBar: document.getElementById("drawProgressBar"),
   
   adjCountStat: document.getElementById("adjCountStat"),
   nounCountStat: document.getElementById("nounCountStat"),
@@ -44,10 +50,21 @@ const elements = {
   adjList: document.getElementById("adjList"),
   nounList: document.getElementById("nounList"),
   
-  btnLoadSample: document.getElementById("btnLoadSample"),
+  btnExportVocab: document.getElementById("btnExportVocab"),
+  fileImportVocab: document.getElementById("fileImportVocab"),
+  btnResetVocab: document.getElementById("btnResetVocab"),
   btnClearAll: document.getElementById("btnClearAll"),
   btnClearAdj: document.getElementById("btnClearAdj"),
   btnClearNoun: document.getElementById("btnClearNoun"),
+  
+  // 批次模態框
+  btnOpenBatchModal: document.getElementById("btnOpenBatchModal"),
+  batchModal: document.getElementById("batchModal"),
+  btnCloseBatchModal: document.getElementById("btnCloseBatchModal"),
+  btnCancelBatch: document.getElementById("btnCancelBatch"),
+  btnConfirmBatch: document.getElementById("btnConfirmBatch"),
+  batchAdjInput: document.getElementById("batchAdjInput"),
+  batchNounInput: document.getElementById("batchNounInput"),
   
   historySection: document.getElementById("historySection"),
   historyList: document.getElementById("historyList"),
@@ -70,39 +87,84 @@ function loadData() {
   try {
     const savedAdj = localStorage.getItem("rw_adjectives");
     const savedNouns = localStorage.getItem("rw_nouns");
+    const savedDrawn = localStorage.getItem("rw_drawnCombos");
     const savedHistory = localStorage.getItem("rw_history");
 
     if (savedAdj !== null && savedNouns !== null) {
       state.adjectives = JSON.parse(savedAdj) || [];
       state.nouns = JSON.parse(savedNouns) || [];
     } else {
-      // 首次進入載入範例資料，讓使用者可直接體驗
+      // 首次進入載入範例資料
       state.adjectives = [...SAMPLE_ADJECTIVES];
       state.nouns = [...SAMPLE_NOUNS];
-      saveData();
+    }
+
+    if (savedDrawn) {
+      state.drawnCombos = JSON.parse(savedDrawn) || [];
     }
 
     if (savedHistory) {
       state.history = JSON.parse(savedHistory) || [];
     }
+
+    // 清理無效組合
+    cleanDrawnCombos();
+    saveData();
   } catch (e) {
     console.error("載入本機資料失敗:", e);
     state.adjectives = [...SAMPLE_ADJECTIVES];
     state.nouns = [...SAMPLE_NOUNS];
+    state.drawnCombos = [];
   }
 }
 
 /**
- * 儲存資料至 LocalStorage
+ * 儲存資料至 LocalStorage (自動持久化保存)
  */
 function saveData() {
   try {
     localStorage.setItem("rw_adjectives", JSON.stringify(state.adjectives));
     localStorage.setItem("rw_nouns", JSON.stringify(state.nouns));
+    localStorage.setItem("rw_drawnCombos", JSON.stringify(state.drawnCombos));
     localStorage.setItem("rw_history", JSON.stringify(state.history));
   } catch (e) {
     console.error("儲存至本機資料失敗:", e);
   }
+}
+
+/**
+ * 清理不存在於現有詞庫中的抽籤組合
+ */
+function cleanDrawnCombos() {
+  const adjSet = new Set(state.adjectives);
+  const nounSet = new Set(state.nouns);
+
+  state.drawnCombos = state.drawnCombos.filter(combo => {
+    const parts = combo.split(":::");
+    return parts.length === 2 && adjSet.has(parts[0]) && nounSet.has(parts[1]);
+  });
+}
+
+/**
+ * 取得所有可能的組合池
+ */
+function getAllCombos() {
+  const combos = [];
+  for (let i = 0; i < state.adjectives.length; i++) {
+    for (let j = 0; j < state.nouns.length; j++) {
+      combos.push(`${state.adjectives[i]}:::${state.nouns[j]}`);
+    }
+  }
+  return combos;
+}
+
+/**
+ * 取得尚未被抽取的剩餘組合
+ */
+function getAvailableCombos() {
+  const drawnSet = new Set(state.drawnCombos);
+  const all = getAllCombos();
+  return all.filter(combo => !drawnSet.has(combo));
 }
 
 /**
@@ -129,45 +191,34 @@ function setupEventListeners() {
     elements.nounInput.focus();
   });
 
-  // 儲存表單事件 (按 Enter 或點擊按鈕)
+  // 儲存表單事件
   elements.wordForm.addEventListener("submit", handleSaveWords);
   elements.btnSave.addEventListener("click", handleSaveWords);
 
-  // 隨機生成事件
-  elements.btnGenerate.addEventListener("click", generateCombination);
+  // 隨機抽取 (不重複)
+  elements.btnGenerate.addEventListener("click", generateNonRepeatingCombination);
 
-  // 複製結果事件
+  // 重置抽選池按鈕
+  elements.btnResetPool.addEventListener("click", resetDrawPool);
+
+  // 複製結果按鈕
   elements.btnCopy.addEventListener("click", copyCurrentResult);
 
-  // 詞庫工具按鈕
-  elements.btnLoadSample.addEventListener("click", () => {
-    // 合併範例（避免重複）
-    let addedAdjCount = 0;
-    let addedNounCount = 0;
+  // 匯出保存詞庫 (下載 JSON)
+  elements.btnExportVocab.addEventListener("click", exportVocabulary);
 
-    SAMPLE_ADJECTIVES.forEach(word => {
-      if (!state.adjectives.includes(word)) {
-        state.adjectives.push(word);
-        addedAdjCount++;
-      }
-    });
+  // 匯入詞庫 (載入 JSON)
+  elements.fileImportVocab.addEventListener("change", importVocabulary);
 
-    SAMPLE_NOUNS.forEach(word => {
-      if (!state.nouns.includes(word)) {
-        state.nouns.push(word);
-        addedNounCount++;
-      }
-    });
+  // 重置詞庫為預設範例
+  elements.btnResetVocab.addEventListener("click", resetVocabularyToDefault);
 
-    saveData();
-    renderAll();
-    showToast(`已載入精選範例！(新增 ${addedAdjCount} 個形容詞，${addedNounCount} 個名詞)`, "success");
-  });
-
+  // 全部清空
   elements.btnClearAll.addEventListener("click", () => {
-    if (confirm("確定要清空所有儲存的形容詞與名詞嗎？")) {
+    if (confirm("確定要清空所有儲存的形容詞與名詞嗎？（已抽取的紀錄也會一併清空）")) {
       state.adjectives = [];
       state.nouns = [];
+      state.drawnCombos = [];
       saveData();
       renderAll();
       showToast("已清空所有詞庫", "warning");
@@ -178,6 +229,7 @@ function setupEventListeners() {
     if (state.adjectives.length === 0) return;
     if (confirm("確定要清空所有形容詞嗎？")) {
       state.adjectives = [];
+      cleanDrawnCombos();
       saveData();
       renderAll();
       showToast("已清空形容詞清單", "warning");
@@ -188,12 +240,32 @@ function setupEventListeners() {
     if (state.nouns.length === 0) return;
     if (confirm("確定要清空所有名詞嗎？")) {
       state.nouns = [];
+      cleanDrawnCombos();
       saveData();
       renderAll();
       showToast("已清空名詞清單", "warning");
     }
   });
 
+  // 批次輸入模態框事件
+  elements.btnOpenBatchModal.addEventListener("click", () => {
+    elements.batchAdjInput.value = "";
+    elements.batchNounInput.value = "";
+    elements.batchModal.style.display = "flex";
+    elements.batchAdjInput.focus();
+  });
+
+  elements.btnCloseBatchModal.addEventListener("click", () => {
+    elements.batchModal.style.display = "none";
+  });
+
+  elements.btnCancelBatch.addEventListener("click", () => {
+    elements.batchModal.style.display = "none";
+  });
+
+  elements.btnConfirmBatch.addEventListener("click", handleConfirmBatch);
+
+  // 歷史紀錄清除
   elements.btnClearHistory.addEventListener("click", () => {
     state.history = [];
     saveData();
@@ -203,7 +275,7 @@ function setupEventListeners() {
 }
 
 /**
- * 處理新增與儲存詞彙
+ * 處理單筆新增與保存詞彙
  */
 function handleSaveWords(e) {
   if (e) e.preventDefault();
@@ -243,22 +315,68 @@ function handleSaveWords(e) {
     }
   }
 
+  cleanDrawnCombos();
   saveData();
   renderAll();
 
-  // 顯示提示訊息
   showToast(messages.join("、"), "success");
 
-  // 回到適當的輸入焦點
   if (!elements.adjInput.value && !elements.nounInput.value) {
     elements.adjInput.focus();
   }
 }
 
 /**
- * 隨機抽取一個形容詞和一個名詞並組合成 "(形容詞 的 名詞)"
+ * 批次儲存詞彙
  */
-function generateCombination() {
+function handleConfirmBatch() {
+  const adjText = elements.batchAdjInput.value.trim();
+  const nounText = elements.batchNounInput.value.trim();
+
+  if (!adjText && !nounText) {
+    showToast("請至少填寫欲新增的形容詞或名詞！", "warning");
+    return;
+  }
+
+  // 依換行、逗號、頓號、空白切分
+  const splitRegex = /[\n\r,，、\s]+/;
+
+  let addedAdj = 0;
+  if (adjText) {
+    const rawAdjs = adjText.split(splitRegex).filter(w => w.trim().length > 0);
+    rawAdjs.forEach(word => {
+      const cleanWord = word.trim();
+      if (!state.adjectives.includes(cleanWord)) {
+        state.adjectives.push(cleanWord);
+        addedAdj++;
+      }
+    });
+  }
+
+  let addedNouns = 0;
+  if (nounText) {
+    const rawNouns = nounText.split(splitRegex).filter(w => w.trim().length > 0);
+    rawNouns.forEach(word => {
+      const cleanWord = word.trim();
+      if (!state.nouns.includes(cleanWord)) {
+        state.nouns.push(cleanWord);
+        addedNouns++;
+      }
+    });
+  }
+
+  elements.batchModal.style.display = "none";
+  cleanDrawnCombos();
+  saveData();
+  renderAll();
+
+  showToast(`批次儲存成功！(新增 ${addedAdj} 個形容詞，${addedNouns} 個名詞)`, "success");
+}
+
+/**
+ * 隨機抽取一個形容詞和一個名詞 (保證不重複抽取)
+ */
+function generateNonRepeatingCombination() {
   if (state.adjectives.length === 0 && state.nouns.length === 0) {
     showToast("詞庫是空的，請先新增形容詞與名詞！", "error");
     elements.adjInput.focus();
@@ -277,20 +395,32 @@ function generateCombination() {
     return;
   }
 
-  // 隨機選取
-  const randomAdjIndex = Math.floor(Math.random() * state.adjectives.length);
-  const randomNounIndex = Math.floor(Math.random() * state.nouns.length);
+  // 取得尚未被抽取的剩餘池
+  const availableCombos = getAvailableCombos();
 
-  const selectedAdj = state.adjectives[randomAdjIndex];
-  const selectedNoun = state.nouns[randomNounIndex];
+  // 若已經全數抽完
+  if (availableCombos.length === 0) {
+    showToast("🎉 所有組合已全部抽取完畢！請點擊「重置抽選池」即可重新開始新一輪抽取。", "warning");
+    elements.resultDisplay.innerHTML = `<span style="font-size: 1.15rem; color: #f59e0b;">🎉 所有組合已全部抽完！請點擊下方「重置抽選池」重新開始</span>`;
+    return;
+  }
+
+  // 隨機選取未抽過的組合
+  const randomIndex = Math.floor(Math.random() * availableCombos.length);
+  const chosenCombo = availableCombos[randomIndex];
+
+  // 記錄已抽取
+  state.drawnCombos.push(chosenCombo);
+
+  // 解析出形容詞與名詞
+  const [selectedAdj, selectedNoun] = chosenCombo.split(":::");
 
   // 組合格式: (形容詞 的 名詞)
   const formattedText = `(${selectedAdj} 的 ${selectedNoun})`;
   state.currentResult = formattedText;
 
-  // 顯示於畫面上（美化標籤渲染）
+  // 顯示於畫面上
   elements.resultDisplay.classList.remove("placeholder", "animate-pop");
-  // 強制重繪觸發動畫
   void elements.resultDisplay.offsetWidth;
   elements.resultDisplay.classList.add("animate-pop");
 
@@ -318,7 +448,122 @@ function generateCombination() {
   }
 
   saveData();
+  renderProgress();
   renderHistory();
+}
+
+/**
+ * 重置抽選池 (清空已抽組合，保留詞庫)
+ */
+function resetDrawPool() {
+  const totalCombos = state.adjectives.length * state.nouns.length;
+  if (state.drawnCombos.length === 0) {
+    showToast("目前抽選池已是全滿狀態，無需重置！", "warning");
+    return;
+  }
+
+  state.drawnCombos = [];
+  saveData();
+  renderProgress();
+  showToast(`已重置抽選池！全數 ${totalCombos} 種組合可重新不重複抽取。`, "success");
+}
+
+/**
+ * 重置詞庫為預設範例
+ */
+function resetVocabularyToDefault() {
+  if (confirm("確定要將詞庫恢復為系統預設範例嗎？（現有詞彙與抽取進度將會重設）")) {
+    state.adjectives = [...SAMPLE_ADJECTIVES];
+    state.nouns = [...SAMPLE_NOUNS];
+    state.drawnCombos = [];
+    state.currentResult = "";
+    saveData();
+    renderAll();
+    elements.resultDisplay.innerHTML = `( 點擊下方按鈕開始不重複抽取 )`;
+    elements.resultDisplay.classList.add("placeholder");
+    elements.btnCopy.disabled = true;
+    showToast("詞庫與抽選進度已重置為預設範例！", "success");
+  }
+}
+
+/**
+ * 匯出並保存詞庫為 JSON 檔案
+ */
+function exportVocabulary() {
+  if (state.adjectives.length === 0 && state.nouns.length === 0) {
+    showToast("目前詞庫為空，無法匯出！", "warning");
+    return;
+  }
+
+  const exportData = {
+    appName: "auto-question-supply",
+    version: "1.0.0",
+    exportedAt: new Date().toISOString(),
+    adjectives: state.adjectives,
+    nouns: state.nouns
+  };
+
+  const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportData, null, 2));
+  const downloadAnchor = document.createElement("a");
+  const fileName = `詞庫備份_${new Date().toISOString().slice(0, 10)}.json`;
+  
+  downloadAnchor.setAttribute("href", dataStr);
+  downloadAnchor.setAttribute("download", fileName);
+  document.body.appendChild(downloadAnchor);
+  downloadAnchor.click();
+  downloadAnchor.remove();
+
+  showToast(`已成功匯出備份檔案：${fileName}`, "success");
+}
+
+/**
+ * 匯入並載入詞庫檔案
+ */
+function importVocabulary(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = function(event) {
+    try {
+      const data = JSON.parse(event.target.result);
+      if (!Array.isArray(data.adjectives) || !Array.isArray(data.nouns)) {
+        throw new Error("檔案格式不符合規範");
+      }
+
+      // 合併詞彙
+      let addedAdj = 0;
+      let addedNoun = 0;
+
+      data.adjectives.forEach(w => {
+        if (typeof w === "string" && w.trim() && !state.adjectives.includes(w.trim())) {
+          state.adjectives.push(w.trim());
+          addedAdj++;
+        }
+      });
+
+      data.nouns.forEach(w => {
+        if (typeof w === "string" && w.trim() && !state.nouns.includes(w.trim())) {
+          state.nouns.push(w.trim());
+          addedNoun++;
+        }
+      });
+
+      cleanDrawnCombos();
+      saveData();
+      renderAll();
+
+      showToast(`匯入成功！新增 ${addedAdj} 個形容詞與 ${addedNoun} 個名詞`, "success");
+    } catch (err) {
+      console.error("匯入失敗:", err);
+      showToast("匯入失敗，請確認是否為有效的詞庫 JSON 檔案！", "error");
+    } finally {
+      // 重置 input 以利重複選取同一檔案
+      elements.fileImportVocab.value = "";
+    }
+  };
+
+  reader.readAsText(file);
 }
 
 /**
@@ -330,7 +575,6 @@ function copyCurrentResult() {
   navigator.clipboard.writeText(state.currentResult).then(() => {
     showToast(`已成功複製：${state.currentResult}`, "success");
   }).catch(() => {
-    // 備援剪貼簿方案
     const tempTextArea = document.createElement("textarea");
     tempTextArea.value = state.currentResult;
     document.body.appendChild(tempTextArea);
@@ -345,7 +589,7 @@ function copyCurrentResult() {
  * 渲染詞庫標籤
  */
 function renderWords() {
-  // 渲染形容詞
+  // 形容詞清單
   elements.adjList.innerHTML = "";
   if (state.adjectives.length === 0) {
     elements.adjList.innerHTML = `<span class="empty-pool-msg">暫無形容詞，請於上方新增</span>`;
@@ -364,7 +608,7 @@ function renderWords() {
     });
   }
 
-  // 渲染名詞
+  // 名詞清單
   elements.nounList.innerHTML = "";
   if (state.nouns.length === 0) {
     elements.nounList.innerHTML = `<span class="empty-pool-msg">暫無名詞，請於上方新增</span>`;
@@ -383,13 +627,33 @@ function renderWords() {
     });
   }
 
-  // 更新徽章計數
   elements.adjBadge.textContent = state.adjectives.length;
   elements.nounBadge.textContent = state.nouns.length;
 }
 
 /**
- * 渲染統計數據
+ * 渲染不重複抽取進度條與統計
+ */
+function renderProgress() {
+  const totalCombos = state.adjectives.length * state.nouns.length;
+  const drawnCount = state.drawnCombos.length;
+  const remainingCount = Math.max(0, totalCombos - drawnCount);
+  const percent = totalCombos > 0 ? Math.round((drawnCount / totalCombos) * 100) : 0;
+
+  elements.drawnProgressText.textContent = `已抽 ${drawnCount} / ${totalCombos} 組 (剩餘 ${remainingCount} 組)`;
+  elements.drawnPercentText.textContent = `${percent}%`;
+  elements.drawProgressBar.style.width = `${percent}%`;
+
+  // 顏色變化
+  if (percent === 100) {
+    elements.drawProgressBar.style.background = "#10b981";
+  } else {
+    elements.drawProgressBar.style.background = "linear-gradient(90deg, #6366f1 0%, #10b981 100%)";
+  }
+}
+
+/**
+ * 渲染詞庫整體統計數據
  */
 function renderStats() {
   const adjCount = state.adjectives.length;
@@ -433,6 +697,7 @@ function renderHistory() {
 function renderAll() {
   renderWords();
   renderStats();
+  renderProgress();
   renderHistory();
 }
 
@@ -442,11 +707,13 @@ function renderAll() {
 function removeWord(type, index) {
   if (type === "adj") {
     const removed = state.adjectives.splice(index, 1)[0];
+    cleanDrawnCombos();
     saveData();
     renderAll();
     showToast(`已刪除形容詞「${removed}」`, "warning");
   } else if (type === "noun") {
     const removed = state.nouns.splice(index, 1)[0];
+    cleanDrawnCombos();
     saveData();
     renderAll();
     showToast(`已刪除名詞「${removed}」`, "warning");
@@ -471,7 +738,7 @@ function showToast(message, type = "success") {
     if (toast.parentNode) {
       toast.parentNode.removeChild(toast);
     }
-  }, 3000);
+  }, 3200);
 }
 
 /**
@@ -488,4 +755,3 @@ function escapeHtml(str) {
     }[tag] || tag)
   );
 }
-
