@@ -19,6 +19,11 @@
 - **📋 實用工具**：
   - 一鍵複製生成結果 `(形容詞 的 名詞)`。
   - 最近 15 筆抽取歷史紀錄回顧。
+- **📄 Google 文件讀取與 GitHub 同步**：
+  - **雙文件讀取**：可分別讀取「形容詞 Google 文件」與「名詞 Google 文件」，一鍵提取詞彙匯入詞庫。
+  - **GitHub 自動提交**：支援透過 GitHub REST API 一鍵將詞庫或文件內容提交（Commit & Push）備份至指定的 GitHub 倉庫與分支。
+  - **自動提取演算法**：支援分行、項目標號（如 `1.`、`2.`、`-`）與逗號／頓號分隔的文字自動解析。
+  - **命令列支援**：提供 `npm run sync-doc` CLI 腳本，方便自動化排程或終端機直接執行。
 
 ---
 
@@ -55,11 +60,17 @@ npx vercel
 
 ```
 .
-├── index.html    # 網頁結構、SEO Meta 與介面
-├── style.css     # 響應式排版、進度條與動畫樣式
-├── script.js     # 不重複抽選演算法、詞庫保存/匯出匯入邏輯
-├── vercel.json   # Vercel 部署與安全性標頭設定檔
-├── package.json  # 專案資訊與指令設定
-├── .gitignore    # Git 忽略檔案設定
-└── README.md     # 專案說明與部署指南
+├── index.html            # 網頁結構、SEO Meta 與介面
+├── style.css             # 響應式排版、進度條、同步面板樣式
+├── script.js             # 抽取演算法、Google 文件讀取與 GitHub Push
+├── vercel.json           # Vercel 部署與安全性標頭設定檔
+├── package.json          # 專案資訊與指令設定 (含 npm run sync-doc)
+├── .gitignore            # Git 忽略檔案設定
+├── README.md             # 專案說明與部署指南
+├── api/
+│   └── fetch-doc.js      # Vercel Serverless Function (Google 文件解析代理)
+├── scripts/
+│   └── sync-doc.js       # CLI 命令列自動同步腳本
+└── data/
+    └── vocabulary.json   # GitHub 雲端同步保存之詞庫資料
 ```

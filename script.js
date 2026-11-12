@@ -57,6 +57,38 @@ const elements = {
   historySection: document.getElementById("historySection"),
   historyList: document.getElementById("historyList"),
   btnClearHistory: document.getElementById("btnClearHistory"),
+
+  // Google Docs & GitHub 同步相關元素
+  adjDocUrl: document.getElementById("adjDocUrl"),
+  btnFetchAdjDoc: document.getElementById("btnFetchAdjDoc"),
+  fetchAdjIcon: document.getElementById("fetchAdjIcon"),
+  
+  nounDocUrl: document.getElementById("nounDocUrl"),
+  btnFetchNounDoc: document.getElementById("btnFetchNounDoc"),
+  fetchNounIcon: document.getElementById("fetchNounIcon"),
+  
+  btnFetchBothDocs: document.getElementById("btnFetchBothDocs"),
+  fetchBothIcon: document.getElementById("fetchBothIcon"),
+  
+  adjDocPreview: document.getElementById("adjDocPreview"),
+  adjDocCharCount: document.getElementById("adjDocCharCount"),
+  nounDocPreview: document.getElementById("nounDocPreview"),
+  nounDocCharCount: document.getElementById("nounDocCharCount"),
+  btnApplyPreviewToVocab: document.getElementById("btnApplyPreviewToVocab"),
+  btnClearDocPreview: document.getElementById("btnClearDocPreview"),
+
+  ghRepoInput: document.getElementById("ghRepoInput"),
+  ghPathInput: document.getElementById("ghPathInput"),
+  ghBranchInput: document.getElementById("ghBranchInput"),
+  ghTokenInput: document.getElementById("ghTokenInput"),
+  btnToggleTokenVisibility: document.getElementById("btnToggleTokenVisibility"),
+  ghCommitMsgInput: document.getElementById("ghCommitMsgInput"),
+  btnPushToGitHub: document.getElementById("btnPushToGitHub"),
+  pushIcon: document.getElementById("pushIcon"),
+  syncStatusMessage: document.getElementById("syncStatusMessage"),
+  pushSuccessContainer: document.getElementById("pushSuccessContainer"),
+  pushSuccessCommitInfo: document.getElementById("pushSuccessCommitInfo"),
+  pushSuccessLink: document.getElementById("pushSuccessLink"),
   
   toastContainer: document.getElementById("toastContainer")
 };
@@ -95,6 +127,21 @@ function loadData() {
     // 清理無效組合
     cleanDrawnCombos();
     saveData();
+
+    // 載入已儲存的 GitHub 與文件設定
+    const savedGhToken = localStorage.getItem("rw_gh_token");
+    const savedGhRepo = localStorage.getItem("rw_gh_repo");
+    const savedGhPath = localStorage.getItem("rw_gh_path");
+    const savedGhBranch = localStorage.getItem("rw_gh_branch");
+    const savedAdjDocUrl = localStorage.getItem("rw_adj_doc_url");
+    const savedNounDocUrl = localStorage.getItem("rw_noun_doc_url");
+
+    if (savedGhToken && elements.ghTokenInput) elements.ghTokenInput.value = savedGhToken;
+    if (savedGhRepo && elements.ghRepoInput) elements.ghRepoInput.value = savedGhRepo;
+    if (savedGhPath && elements.ghPathInput) elements.ghPathInput.value = savedGhPath;
+    if (savedGhBranch && elements.ghBranchInput) elements.ghBranchInput.value = savedGhBranch;
+    if (savedAdjDocUrl && elements.adjDocUrl) elements.adjDocUrl.value = savedAdjDocUrl;
+    if (savedNounDocUrl && elements.nounDocUrl) elements.nounDocUrl.value = savedNounDocUrl;
   } catch (e) {
     console.error("載入本機資料失敗:", e);
     state.adjectives = [];
@@ -259,6 +306,65 @@ function setupEventListeners() {
     renderHistory();
     showToast("已清除抽取紀錄", "warning");
   });
+
+  // Google Docs & GitHub 同步事件監聽
+  if (elements.adjDocUrl) {
+    elements.adjDocUrl.addEventListener("change", () => {
+      localStorage.setItem("rw_adj_doc_url", elements.adjDocUrl.value.trim());
+    });
+  }
+  if (elements.nounDocUrl) {
+    elements.nounDocUrl.addEventListener("change", () => {
+      localStorage.setItem("rw_noun_doc_url", elements.nounDocUrl.value.trim());
+    });
+  }
+  if (elements.btnFetchAdjDoc) {
+    elements.btnFetchAdjDoc.addEventListener("click", handleFetchAdjDoc);
+  }
+  if (elements.btnFetchNounDoc) {
+    elements.btnFetchNounDoc.addEventListener("click", handleFetchNounDoc);
+  }
+  if (elements.btnFetchBothDocs) {
+    elements.btnFetchBothDocs.addEventListener("click", handleFetchBothDocs);
+  }
+  if (elements.adjDocPreview) {
+    elements.adjDocPreview.addEventListener("input", updateDocPreviewCounts);
+  }
+  if (elements.nounDocPreview) {
+    elements.nounDocPreview.addEventListener("input", updateDocPreviewCounts);
+  }
+  if (elements.btnApplyPreviewToVocab) {
+    elements.btnApplyPreviewToVocab.addEventListener("click", handleApplyPreviewToVocab);
+  }
+  if (elements.btnClearDocPreview) {
+    elements.btnClearDocPreview.addEventListener("click", handleClearDocPreview);
+  }
+  if (elements.btnToggleTokenVisibility) {
+    elements.btnToggleTokenVisibility.addEventListener("click", handleToggleTokenVisibility);
+  }
+  if (elements.btnPushToGitHub) {
+    elements.btnPushToGitHub.addEventListener("click", handlePushToGitHub);
+  }
+  if (elements.ghRepoInput) {
+    elements.ghRepoInput.addEventListener("change", () => {
+      localStorage.setItem("rw_gh_repo", elements.ghRepoInput.value.trim());
+    });
+  }
+  if (elements.ghPathInput) {
+    elements.ghPathInput.addEventListener("change", () => {
+      localStorage.setItem("rw_gh_path", elements.ghPathInput.value.trim());
+    });
+  }
+  if (elements.ghBranchInput) {
+    elements.ghBranchInput.addEventListener("change", () => {
+      localStorage.setItem("rw_gh_branch", elements.ghBranchInput.value.trim());
+    });
+  }
+  if (elements.ghTokenInput) {
+    elements.ghTokenInput.addEventListener("change", () => {
+      localStorage.setItem("rw_gh_token", elements.ghTokenInput.value.trim());
+    });
+  }
 }
 
 /**
@@ -728,3 +834,502 @@ function escapeHtml(str) {
     }[tag] || tag)
   );
 }
+
+/* ========================================================
+   Google 文件讀取與 GitHub 同步功能
+   ======================================================== */
+
+/**
+ * 從 Google 文件網址或 ID 提取資訊
+ */
+function extractDocInfo(inputUrl) {
+  if (!inputUrl) return null;
+  const trimmed = inputUrl.trim();
+  const pubMatch = trimmed.match(/\/document\/d\/e\/([a-zA-Z0-9-_]+)/);
+  if (pubMatch) return { id: pubMatch[1], isPub: true };
+  const docMatch = trimmed.match(/\/document\/(?:u\/\d+\/)?d\/([a-zA-Z0-9-_]+)/);
+  if (docMatch) return { id: docMatch[1], isPub: false };
+  if (/^[a-zA-Z0-9-_]{20,}$/.test(trimmed)) {
+    return { id: trimmed, isPub: false };
+  }
+  return null;
+}
+
+/**
+ * 擷取單一 Google 文件文字內容
+ */
+async function fetchSingleGoogleDoc(url) {
+  if (!url || !url.trim()) {
+    throw new Error("請提供 Google 文件網址或 ID");
+  }
+
+  const info = extractDocInfo(url);
+  if (!info) {
+    throw new Error("無法辨識此網址，請確認輸入的是標準 Google 文件網址或 ID");
+  }
+
+  let text = null;
+
+  // 1. 嘗試本地或 Vercel Serverless API (/api/fetch-doc)
+  try {
+    const res = await fetch(`/api/fetch-doc?url=${encodeURIComponent(url.trim())}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success && typeof data.text === "string") {
+        text = data.text;
+      } else if (data.error) {
+        throw new Error(data.error);
+      }
+    } else if (res.status !== 404) {
+      const errJson = await res.json().catch(() => ({}));
+      throw new Error(errJson.error || `HTTP ${res.status}`);
+    }
+  } catch (e) {
+    if (e.message && !e.message.includes("404") && !e.message.includes("Failed to fetch")) {
+      throw e;
+    }
+  }
+
+  // 2. 本地靜態預覽 fallback：直接使用代理取得 export txt
+  if (text === null) {
+    const exportUrl = info.isPub
+      ? `https://docs.google.com/document/d/e/${info.id}/pub?output=txt`
+      : `https://docs.google.com/document/d/${info.id}/export?format=txt`;
+
+    try {
+      const p1 = `https://corsproxy.io/?${encodeURIComponent(exportUrl)}`;
+      const res1 = await fetch(p1);
+      if (res1.ok) {
+        const t = await res1.text();
+        if (!t.includes('accounts.google.com')) {
+          text = t.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n');
+        }
+      }
+    } catch (_) {}
+
+    if (text === null) {
+      try {
+        const p2 = `https://api.allorigins.win/raw?url=${encodeURIComponent(exportUrl)}`;
+        const res2 = await fetch(p2);
+        if (res2.ok) {
+          const t = await res2.text();
+          if (!t.includes('accounts.google.com')) {
+            text = t.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n');
+          }
+        }
+      } catch (_) {}
+    }
+  }
+
+  if (text === null || text === undefined) {
+    throw new Error("無法讀取 Google 文件。請確認已開啟「知道連結的任何人均可查看」，或手動將文字貼在預覽框中。");
+  }
+
+  return text;
+}
+
+/**
+ * 從文件文字中提取詞彙陣列 (支援分行、編號標號、逗點頓號)
+ */
+function extractWordsFromDocText(text) {
+  if (!text) return [];
+  const lines = text.split(/\r?\n/);
+  const words = [];
+  for (let line of lines) {
+    line = line.trim();
+    if (!line) continue;
+    // 移除前面可能的項目符號或數字標號 (如 1. 、 1、 、 - )
+    line = line.replace(/^[\d+]+[\.\、\)\-\s]+/, '').replace(/^[\-\*\•]\s+/, '').trim();
+    if (!line) continue;
+    // 依逗號、頓號、分號、空白分隔
+    const tokens = line.split(/[,，、;\t\s]+/).map(t => t.trim()).filter(Boolean);
+    for (const t of tokens) {
+      if (t && !words.includes(t)) {
+        words.push(t);
+      }
+    }
+  }
+  return words;
+}
+
+/**
+ * 更新預覽框的字元與詞彙數量統計
+ */
+function updateDocPreviewCounts() {
+  if (elements.adjDocPreview && elements.adjDocCharCount) {
+    const text = elements.adjDocPreview.value;
+    const words = extractWordsFromDocText(text);
+    elements.adjDocCharCount.textContent = `${text.length} 個字元 / ${words.length} 個詞`;
+  }
+  if (elements.nounDocPreview && elements.nounDocCharCount) {
+    const text = elements.nounDocPreview.value;
+    const words = extractWordsFromDocText(text);
+    elements.nounDocCharCount.textContent = `${text.length} 個字元 / ${words.length} 個詞`;
+  }
+}
+
+/**
+ * 單獨讀取形容詞文件
+ */
+async function handleFetchAdjDoc() {
+  const url = elements.adjDocUrl.value.trim();
+  if (!url) {
+    showToast("請輸入形容詞 Google 文件網址", "warning");
+    elements.adjDocUrl.focus();
+    return;
+  }
+  localStorage.setItem("rw_adj_doc_url", url);
+
+  elements.btnFetchAdjDoc.disabled = true;
+  elements.fetchAdjIcon.textContent = "⏳";
+  elements.syncStatusMessage.textContent = "正在讀取形容詞 Google 文件...";
+
+  try {
+    const text = await fetchSingleGoogleDoc(url);
+    elements.adjDocPreview.value = text;
+    updateDocPreviewCounts();
+    const words = extractWordsFromDocText(text);
+    if (words.length === 0 && text.length === 0) {
+      showToast("形容詞文件讀取成功，但目前文件內無文字。可在 Google 文件輸入後再次讀取！", "warning");
+      elements.syncStatusMessage.textContent = "形容詞文件內容為空。";
+    } else {
+      showToast(`已讀取形容詞文件！共 ${words.length} 個詞彙 (${text.length} 字元)`, "success");
+      elements.syncStatusMessage.textContent = `成功讀取形容詞文件（${words.length} 個詞）`;
+    }
+  } catch (err) {
+    console.error("Fetch Adj Doc Error:", err);
+    showToast(`形容詞讀取失敗: ${err.message}`, "error");
+    elements.syncStatusMessage.textContent = `讀取失敗: ${err.message}`;
+  } finally {
+    elements.btnFetchAdjDoc.disabled = false;
+    elements.fetchAdjIcon.textContent = "📥";
+  }
+}
+
+/**
+ * 單獨讀取名詞文件
+ */
+async function handleFetchNounDoc() {
+  const url = elements.nounDocUrl.value.trim();
+  if (!url) {
+    showToast("請輸入名詞 Google 文件網址", "warning");
+    elements.nounDocUrl.focus();
+    return;
+  }
+  localStorage.setItem("rw_noun_doc_url", url);
+
+  elements.btnFetchNounDoc.disabled = true;
+  elements.fetchNounIcon.textContent = "⏳";
+  elements.syncStatusMessage.textContent = "正在讀取名詞 Google 文件...";
+
+  try {
+    const text = await fetchSingleGoogleDoc(url);
+    elements.nounDocPreview.value = text;
+    updateDocPreviewCounts();
+    const words = extractWordsFromDocText(text);
+    if (words.length === 0 && text.length === 0) {
+      showToast("名詞文件讀取成功，但目前文件內無文字。可在 Google 文件輸入後再次讀取！", "warning");
+      elements.syncStatusMessage.textContent = "名詞文件內容為空。";
+    } else {
+      showToast(`已讀取名詞文件！共 ${words.length} 個詞彙 (${text.length} 字元)`, "success");
+      elements.syncStatusMessage.textContent = `成功讀取名詞文件（${words.length} 個詞）`;
+    }
+  } catch (err) {
+    console.error("Fetch Noun Doc Error:", err);
+    showToast(`名詞讀取失敗: ${err.message}`, "error");
+    elements.syncStatusMessage.textContent = `讀取失敗: ${err.message}`;
+  } finally {
+    elements.btnFetchNounDoc.disabled = false;
+    elements.fetchNounIcon.textContent = "📥";
+  }
+}
+
+/**
+ * 一鍵同時讀取兩份文件並直接更新詞庫
+ */
+async function handleFetchBothDocs() {
+  const adjUrl = elements.adjDocUrl.value.trim();
+  const nounUrl = elements.nounDocUrl.value.trim();
+
+  if (!adjUrl && !nounUrl) {
+    showToast("請輸入至少一份 Google 文件的網址", "warning");
+    return;
+  }
+
+  elements.btnFetchBothDocs.disabled = true;
+  elements.fetchBothIcon.textContent = "⏳";
+  elements.syncStatusMessage.textContent = "正在同時讀取形容詞與名詞文件...";
+
+  let adjWordsCount = 0;
+  let nounWordsCount = 0;
+
+  try {
+    const tasks = [];
+    if (adjUrl) {
+      tasks.push(
+        fetchSingleGoogleDoc(adjUrl).then(text => {
+          elements.adjDocPreview.value = text;
+          const words = extractWordsFromDocText(text);
+          adjWordsCount = words.length;
+          return { type: 'adj', text, words };
+        })
+      );
+    }
+    if (nounUrl) {
+      tasks.push(
+        fetchSingleGoogleDoc(nounUrl).then(text => {
+          elements.nounDocPreview.value = text;
+          const words = extractWordsFromDocText(text);
+          nounWordsCount = words.length;
+          return { type: 'noun', text, words };
+        })
+      );
+    }
+
+    const results = await Promise.all(tasks);
+    updateDocPreviewCounts();
+
+    // 更新到詞庫 state
+    let totalAddedAdj = 0;
+    let totalAddedNoun = 0;
+
+    for (const r of results) {
+      if (r.type === 'adj') {
+        r.words.forEach(w => {
+          if (!state.adjectives.includes(w)) {
+            state.adjectives.push(w);
+            totalAddedAdj++;
+          }
+        });
+      } else if (r.type === 'noun') {
+        r.words.forEach(w => {
+          if (!state.nouns.includes(w)) {
+            state.nouns.push(w);
+            totalAddedNoun++;
+          }
+        });
+      }
+    }
+
+    cleanDrawnCombos();
+    saveData();
+    renderAll();
+
+    if (totalAddedAdj === 0 && totalAddedNoun === 0 && adjWordsCount === 0 && nounWordsCount === 0) {
+      showToast("文件讀取成功，但目前內容為空。可在 Google 文件中填入詞彙後再次點擊！", "warning");
+      elements.syncStatusMessage.textContent = "已連線至 Google 文件（內容目前為空）。";
+    } else {
+      showToast(`同步完成！詞庫已新增 ${totalAddedAdj} 個形容詞與 ${totalAddedNoun} 個名詞`, "success");
+      elements.syncStatusMessage.textContent = `成功載入：${totalAddedAdj} 個新形容詞、${totalAddedNoun} 個新名詞`;
+    }
+  } catch (err) {
+    console.error("Fetch both docs error:", err);
+    showToast(`讀取失敗: ${err.message}`, "error");
+    elements.syncStatusMessage.textContent = `讀取失敗: ${err.message}`;
+  } finally {
+    elements.btnFetchBothDocs.disabled = false;
+    elements.fetchBothIcon.textContent = "⚡";
+  }
+}
+
+/**
+ * 將預覽框內的文字手動套用至詞庫
+ */
+function handleApplyPreviewToVocab() {
+  const adjText = elements.adjDocPreview.value;
+  const nounText = elements.nounDocPreview.value;
+
+  const adjWords = extractWordsFromDocText(adjText);
+  const nounWords = extractWordsFromDocText(nounText);
+
+  if (adjWords.length === 0 && nounWords.length === 0) {
+    showToast("預覽框中無任何有效詞彙可套用", "warning");
+    return;
+  }
+
+  let addedAdj = 0;
+  let addedNoun = 0;
+
+  adjWords.forEach(w => {
+    if (!state.adjectives.includes(w)) {
+      state.adjectives.push(w);
+      addedAdj++;
+    }
+  });
+
+  nounWords.forEach(w => {
+    if (!state.nouns.includes(w)) {
+      state.nouns.push(w);
+      addedNoun++;
+    }
+  });
+
+  cleanDrawnCombos();
+  saveData();
+  renderAll();
+  showToast(`已成功套用至詞庫！新增 ${addedAdj} 個形容詞、${addedNoun} 個名詞`, "success");
+}
+
+/**
+ * 清空預覽框
+ */
+function handleClearDocPreview() {
+  elements.adjDocPreview.value = "";
+  elements.nounDocPreview.value = "";
+  updateDocPreviewCounts();
+  showToast("已清空預覽框內容", "info");
+}
+
+/**
+ * 切換 Token 密碼顯示狀態
+ */
+function handleToggleTokenVisibility() {
+  if (elements.ghTokenInput.type === "password") {
+    elements.ghTokenInput.type = "text";
+    elements.btnToggleTokenVisibility.textContent = "🙈";
+  } else {
+    elements.ghTokenInput.type = "password";
+    elements.btnToggleTokenVisibility.textContent = "👁️";
+  }
+}
+
+/**
+ * 推送資料至 GitHub
+ */
+async function handlePushToGitHub() {
+  const repo = elements.ghRepoInput.value.trim();
+  const filePath = elements.ghPathInput.value.trim().replace(/^\/+/, '');
+  const branch = elements.ghBranchInput.value.trim() || "main";
+  const token = elements.ghTokenInput.value.trim();
+  const commitMessage = elements.ghCommitMsgInput.value.trim() || `docs: 更新 ${filePath} (來自 Google 文件同步)`;
+
+  if (!token) {
+    showToast("請輸入 GitHub Personal Access Token (PAT)", "warning");
+    elements.ghTokenInput.focus();
+    return;
+  }
+
+  if (!repo || !repo.includes('/')) {
+    showToast("儲存庫格式需為「擁有者/倉庫名稱」，例如：s411318-abc/auto-question-supply", "warning");
+    elements.ghRepoInput.focus();
+    return;
+  }
+
+  if (!filePath) {
+    showToast("請輸入目標檔案路徑，例如：data/vocabulary.json", "warning");
+    elements.ghPathInput.focus();
+    return;
+  }
+
+  // 儲存設定至 LocalStorage
+  localStorage.setItem("rw_gh_token", token);
+  localStorage.setItem("rw_gh_repo", repo);
+  localStorage.setItem("rw_gh_path", filePath);
+  localStorage.setItem("rw_gh_branch", branch);
+
+  // 決定要推送到 GitHub 的檔案內容
+  let content = "";
+  if (filePath.endsWith('.json')) {
+    const adjWords = extractWordsFromDocText(elements.adjDocPreview.value);
+    const nounWords = extractWordsFromDocText(elements.nounDocPreview.value);
+    
+    // 若預覽框為空，以目前詞庫 state 為主
+    const finalAdjectives = adjWords.length > 0 ? adjWords : state.adjectives;
+    const finalNouns = nounWords.length > 0 ? nounWords : state.nouns;
+
+    const dataObj = {
+      updatedAt: new Date().toISOString(),
+      adjectives: finalAdjectives,
+      nouns: finalNouns,
+      sources: {
+        adjectivesDoc: elements.adjDocUrl.value.trim(),
+        nounsDoc: elements.nounDocUrl.value.trim()
+      }
+    };
+    content = JSON.stringify(dataObj, null, 2);
+  } else {
+    const adjPart = elements.adjDocPreview.value.trim();
+    const nounPart = elements.nounDocPreview.value.trim();
+    if (!adjPart && !nounPart) {
+      content = `# 形容詞清單\n${state.adjectives.join('\n')}\n\n# 名詞清單\n${state.nouns.join('\n')}\n`;
+    } else {
+      content = `# 形容詞\n${adjPart}\n\n# 名詞\n${nounPart}\n`;
+    }
+  }
+
+  elements.btnPushToGitHub.disabled = true;
+  elements.pushIcon.textContent = "⏳";
+  elements.syncStatusMessage.textContent = "正在提交並推送到 GitHub...";
+  elements.pushSuccessContainer.style.display = "none";
+
+  try {
+    const headers = {
+      'Authorization': `Bearer ${token}`,
+      'Accept': 'application/vnd.github.v3+json',
+      'Content-Type': 'application/json'
+    };
+
+    // 1. 查詢現有檔案 SHA
+    let sha = null;
+    const checkUrl = `https://api.github.com/repos/${repo}/contents/${encodeURIComponent(filePath).replace(/%2F/g, '/')}?ref=${encodeURIComponent(branch)}`;
+    const checkRes = await fetch(checkUrl, { headers });
+
+    if (checkRes.ok) {
+      const fileData = await checkRes.json();
+      sha = fileData.sha;
+    } else if (checkRes.status !== 404) {
+      const errData = await checkRes.json().catch(() => ({}));
+      throw new Error(errData.message || `檢查檔案失敗 (HTTP ${checkRes.status})`);
+    }
+
+    // 2. Base64 UTF-8 編碼
+    const utf8Bytes = new TextEncoder().encode(content);
+    let binary = '';
+    for (let i = 0; i < utf8Bytes.byteLength; i++) {
+      binary += String.fromCharCode(utf8Bytes[i]);
+    }
+    const base64Content = btoa(binary);
+
+    // 3. 提交 PUT
+    const putUrl = `https://api.github.com/repos/${repo}/contents/${encodeURIComponent(filePath).replace(/%2F/g, '/')}`;
+    const bodyPayload = {
+      message: commitMessage,
+      content: base64Content,
+      branch: branch
+    };
+    if (sha) {
+      bodyPayload.sha = sha;
+    }
+
+    const putRes = await fetch(putUrl, {
+      method: "PUT",
+      headers,
+      body: JSON.stringify(bodyPayload)
+    });
+
+    if (!putRes.ok) {
+      const errData = await putRes.json().catch(() => ({}));
+      throw new Error(errData.message || `提交失敗 (HTTP ${putRes.status})`);
+    }
+
+    const putResult = await putRes.json();
+    const htmlUrl = putResult.content && putResult.content.html_url
+      ? putResult.content.html_url
+      : `https://github.com/${repo}/blob/${branch}/${filePath}`;
+
+    showToast("🎉 成功推送到 GitHub！", "success");
+    elements.syncStatusMessage.textContent = `推送成功！Commit: ${putResult.commit.sha.slice(0, 7)}`;
+
+    elements.pushSuccessCommitInfo.textContent = `Commit SHA: ${putResult.commit.sha.slice(0, 7)}（${commitMessage}）`;
+    elements.pushSuccessLink.href = htmlUrl;
+    elements.pushSuccessContainer.style.display = "flex";
+  } catch (err) {
+    console.error("Push to GitHub Error:", err);
+    showToast(`推送失敗: ${err.message}`, "error");
+    elements.syncStatusMessage.textContent = `推送失敗: ${err.message}`;
+  } finally {
+    elements.btnPushToGitHub.disabled = false;
+    elements.pushIcon.textContent = "🚀";
+  }
+}
+

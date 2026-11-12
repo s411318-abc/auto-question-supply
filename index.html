@@ -174,6 +174,167 @@
       </div>
     </section>
 
+    <!-- Google Docs Extraction & GitHub Sync Section -->
+    <section class="card doc-sync-card" id="docSyncSection">
+      <div class="section-title-bar">
+        <h2><span class="section-icon">📄</span> Google 文件文字讀取 ➔ 推送至 GitHub</h2>
+        <span class="sync-badge">雲端同步</span>
+      </div>
+      <p class="section-desc">
+        支援分別讀取<strong>形容詞</strong>與<strong>名詞</strong>的 Google 文件，一鍵提取文字更新至詞庫，並自動提交（Commit & Push）備份至 GitHub 倉庫。
+      </p>
+
+      <!-- Step 1: Read Google Docs -->
+      <div class="sync-step-block">
+        <div class="step-header">
+          <span class="step-num">步驟 1</span>
+          <h3>指定 Google 文件來源</h3>
+        </div>
+
+        <div class="doc-inputs-grid">
+          <!-- 形容詞文件 -->
+          <div class="form-group">
+            <label for="adjDocUrl">
+              <span class="tag-badge badge-adj">形容詞 Google 文件網址</span>
+            </label>
+            <div class="input-with-button">
+              <input 
+                type="url" 
+                id="adjDocUrl" 
+                value="https://docs.google.com/document/d/1VroI-PQY44U87PfjPRgaRX0Z-gFDiXgfl4oSPI14b5s/edit?usp=sharing"
+                placeholder="https://docs.google.com/document/d/..." 
+                autocomplete="off"
+              />
+              <button type="button" id="btnFetchAdjDoc" class="btn btn-outline" title="單獨讀取形容詞">
+                <span class="btn-icon" id="fetchAdjIcon">📥</span> 讀取
+              </button>
+            </div>
+          </div>
+
+          <!-- 名詞文件 -->
+          <div class="form-group">
+            <label for="nounDocUrl">
+              <span class="tag-badge badge-noun">名詞 Google 文件網址</span>
+            </label>
+            <div class="input-with-button">
+              <input 
+                type="url" 
+                id="nounDocUrl" 
+                value="https://docs.google.com/document/d/1RSqBWOGG3jC5UcPZY-f81CII9cp8ppU6u-VYox4TDRM/edit?usp=sharing"
+                placeholder="https://docs.google.com/document/d/..." 
+                autocomplete="off"
+              />
+              <button type="button" id="btnFetchNounDoc" class="btn btn-outline" title="單獨讀取名詞">
+                <span class="btn-icon" id="fetchNounIcon">📥</span> 讀取
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="doc-actions-bar">
+          <button type="button" id="btnFetchBothDocs" class="btn btn-primary btn-large">
+            <span class="btn-icon" id="fetchBothIcon">⚡</span> 一鍵同時讀取兩份文件並更新詞庫
+          </button>
+          <div class="input-hint">
+            💡 提示：文件請開啟「<strong>知道連結的任何人均可查看</strong>」。目前兩份文件均已預設為您提供的連結，點擊即可讀取。
+          </div>
+        </div>
+
+        <!-- Preview & Edit Text Area -->
+        <div class="preview-grid" style="margin-top: 1.25rem;">
+          <div class="form-group">
+            <div class="preview-header">
+              <label for="adjDocPreview">形容詞文件內容預覽：</label>
+              <span class="char-count" id="adjDocCharCount">0 個字元 / 0 個詞</span>
+            </div>
+            <textarea 
+              id="adjDocPreview" 
+              rows="5" 
+              placeholder="讀取後顯示形容詞內容，亦可直接在此手動輸入或編輯..."
+            ></textarea>
+          </div>
+
+          <div class="form-group">
+            <div class="preview-header">
+              <label for="nounDocPreview">名詞文件內容預覽：</label>
+              <span class="char-count" id="nounDocCharCount">0 個字元 / 0 個詞</span>
+            </div>
+            <textarea 
+              id="nounDocPreview" 
+              rows="5" 
+              placeholder="讀取後顯示名詞內容，亦可直接在此手動輸入或編輯..."
+            ></textarea>
+          </div>
+        </div>
+
+        <div class="preview-actions">
+          <button type="button" id="btnApplyPreviewToVocab" class="btn btn-sm btn-success" title="將下方預覽的文字直接匯入並刷新詞庫">
+            <span>✨ 套用預覽文字至當前詞庫</span>
+          </button>
+          <button type="button" id="btnClearDocPreview" class="btn btn-sm btn-ghost">
+            <span>清空預覽框</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Step 2: GitHub Push Configuration -->
+      <div class="sync-step-block" style="margin-top: 1.5rem;">
+        <div class="step-header">
+          <span class="step-num">步驟 2</span>
+          <h3>GitHub 推送設定</h3>
+        </div>
+        
+        <div class="github-config-grid">
+          <div class="form-group">
+            <label for="ghRepoInput">GitHub 儲存庫 (擁有者/名稱)：</label>
+            <input type="text" id="ghRepoInput" value="s411318-abc/auto-question-supply" placeholder="例如：s411318-abc/auto-question-supply" />
+          </div>
+
+          <div class="form-group">
+            <label for="ghPathInput">儲存檔案路徑：</label>
+            <input type="text" id="ghPathInput" value="data/vocabulary.json" placeholder="例如：data/vocabulary.json 或 data/questions.txt" />
+          </div>
+
+          <div class="form-group">
+            <label for="ghBranchInput">目標分支 (Branch)：</label>
+            <input type="text" id="ghBranchInput" value="main" placeholder="main" />
+          </div>
+
+          <div class="form-group">
+            <label for="ghTokenInput">GitHub Personal Access Token (PAT)：</label>
+            <div class="input-wrapper">
+              <input type="password" id="ghTokenInput" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" autocomplete="off" />
+              <button type="button" class="clear-input-btn" id="btnToggleTokenVisibility" title="顯示/隱藏 Token" style="font-size: 1rem;">👁️</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-top: 0.85rem;">
+          <label for="ghCommitMsgInput">Commit 提交訊息：</label>
+          <input type="text" id="ghCommitMsgInput" value="docs: 更新 Google 文件的形容詞與名詞資料" />
+        </div>
+
+        <div class="sync-action-bar">
+          <button type="button" id="btnPushToGitHub" class="btn btn-success btn-large">
+            <span class="btn-icon" id="pushIcon">🚀</span> 推送至 GitHub
+          </button>
+          <span class="sync-status" id="syncStatusMessage"></span>
+        </div>
+
+        <!-- Success Result Display -->
+        <div id="pushSuccessContainer" class="push-success-card" style="display: none;">
+          <div class="success-icon">🎉</div>
+          <div class="success-details">
+            <div class="success-title">檔案已成功推送到 GitHub！</div>
+            <p id="pushSuccessCommitInfo" class="success-sha"></p>
+            <a id="pushSuccessLink" href="#" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline-primary">
+              🌐 在 GitHub 上開啟此檔案 ↗
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- History Log Section -->
     <section class="card history-card" id="historySection" style="display: none;">
       <div class="history-header">

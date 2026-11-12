@@ -831,6 +831,177 @@ textarea::-webkit-scrollbar-thumb {
   pointer-events: none;
 }
 
+/* Google Docs to GitHub Sync Card */
+.doc-sync-card {
+  border-top: 4px solid var(--primary-color);
+}
+
+.sync-badge {
+  background: var(--primary-light);
+  color: var(--primary-color);
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 0.2rem 0.65rem;
+  border-radius: 20px;
+}
+
+.sync-step-block {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: var(--radius-md);
+  padding: 1.25rem;
+}
+
+.doc-inputs-grid,
+.preview-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.doc-actions-bar {
+  margin-top: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.step-header {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  margin-bottom: 0.85rem;
+}
+
+.step-num {
+  background: var(--primary-color);
+  color: white;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.15rem 0.55rem;
+  border-radius: 12px;
+  letter-spacing: 0.02em;
+}
+
+.step-header h3 {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.input-with-button {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.input-with-button input {
+  flex: 1;
+}
+
+.input-hint {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  margin-top: 0.4rem;
+  line-height: 1.45;
+}
+
+.preview-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.35rem;
+}
+
+.preview-header label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #334155;
+}
+
+.char-count {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+#docContentPreview {
+  width: 100%;
+  padding: 0.75rem;
+  font-family: inherit;
+  font-size: 0.92rem;
+  border: 1.5px solid #cbd5e1;
+  border-radius: var(--radius-sm);
+  resize: vertical;
+  background: #ffffff;
+  transition: var(--transition);
+}
+
+#docContentPreview:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+}
+
+.preview-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.github-config-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.85rem;
+}
+
+.sync-action-bar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.sync-status {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.push-success-card {
+  margin-top: 1.15rem;
+  background: #ecfdf5;
+  border: 1.5px solid #a7f3d0;
+  border-radius: var(--radius-md);
+  padding: 1.1rem 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  animation: slideUp 0.3s ease;
+}
+
+.push-success-card .success-icon {
+  font-size: 2rem;
+}
+
+.push-success-card .success-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.push-success-card .success-title {
+  color: #065f46;
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+.push-success-card .success-sha {
+  font-size: 0.82rem;
+  color: #047857;
+  font-family: monospace;
+}
+
 .toast {
   pointer-events: auto;
   background: #1e293b;
@@ -887,8 +1058,19 @@ textarea::-webkit-scrollbar-thumb {
   }
 
   .input-grid,
-  .vocab-grid {
+  .vocab-grid,
+  .github-config-grid,
+  .doc-inputs-grid,
+  .preview-grid {
     grid-template-columns: 1fr;
+  }
+
+  .input-with-button {
+    flex-direction: column;
+  }
+
+  .input-with-button button {
+    width: 100%;
   }
 
   .generator-actions {
