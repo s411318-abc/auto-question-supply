@@ -5,6 +5,15 @@
 function extractDocInfo(inputUrl) {
   if (!inputUrl) return null;
   const trimmed = inputUrl.trim();
+
+  // 支援短網址對應 (reurl.cc)
+  if (trimmed.includes('reurl.cc/omklQg')) {
+    return { id: '1VroI-PQY44U87PfjPRgaRX0Z-gFDiXgfl4oSPI14b5s', isPub: false };
+  }
+  if (trimmed.includes('reurl.cc/xe5d94')) {
+    return { id: '1RSqBWOGG3jC5UcPZY-f81CII9cp8ppU6u-VYox4TDRM', isPub: false };
+  }
+
   const pubMatch = trimmed.match(/\/document\/d\/e\/([a-zA-Z0-9-_]+)/);
   if (pubMatch) return { id: pubMatch[1], isPub: true };
   const docMatch = trimmed.match(/\/document\/(?:u\/\d+\/)?d\/([a-zA-Z0-9-_]+)/);

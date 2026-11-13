@@ -115,12 +115,23 @@ function loadData() {
     cleanDrawnCombos();
     saveData();
 
-    // 載入已儲存的文件設定
-    const savedAdjDocUrl = localStorage.getItem("rw_adj_doc_url");
-    const savedNounDocUrl = localStorage.getItem("rw_noun_doc_url");
+    // 載入已儲存的文件設定 (若為舊版預設網址，自動更新為新短網址)
+    const OLD_ADJ = "https://docs.google.com/document/d/1VroI-PQY44U87PfjPRgaRX0Z-gFDiXgfl4oSPI14b5s/edit?usp=sharing";
+    const OLD_NOUN = "https://docs.google.com/document/d/1RSqBWOGG3jC5UcPZY-f81CII9cp8ppU6u-VYox4TDRM/edit?usp=sharing";
+    let savedAdjDocUrl = localStorage.getItem("rw_adj_doc_url");
+    let savedNounDocUrl = localStorage.getItem("rw_noun_doc_url");
 
-    if (savedAdjDocUrl && elements.adjDocUrl) elements.adjDocUrl.value = savedAdjDocUrl;
-    if (savedNounDocUrl && elements.nounDocUrl) elements.nounDocUrl.value = savedNounDocUrl;
+    if (!savedAdjDocUrl || savedAdjDocUrl === OLD_ADJ) {
+      savedAdjDocUrl = "https://reurl.cc/omklQg";
+      localStorage.setItem("rw_adj_doc_url", savedAdjDocUrl);
+    }
+    if (!savedNounDocUrl || savedNounDocUrl === OLD_NOUN) {
+      savedNounDocUrl = "https://reurl.cc/xe5d94";
+      localStorage.setItem("rw_noun_doc_url", savedNounDocUrl);
+    }
+
+    if (elements.adjDocUrl) elements.adjDocUrl.value = savedAdjDocUrl;
+    if (elements.nounDocUrl) elements.nounDocUrl.value = savedNounDocUrl;
   } catch (e) {
     console.error("載入本機資料失敗:", e);
     state.adjectives = [];
@@ -798,6 +809,15 @@ function escapeHtml(str) {
 function extractDocInfo(inputUrl) {
   if (!inputUrl) return null;
   const trimmed = inputUrl.trim();
+
+  // 支援短網址對應 (reurl.cc)
+  if (trimmed.includes('reurl.cc/omklQg')) {
+    return { id: '1VroI-PQY44U87PfjPRgaRX0Z-gFDiXgfl4oSPI14b5s', isPub: false };
+  }
+  if (trimmed.includes('reurl.cc/xe5d94')) {
+    return { id: '1RSqBWOGG3jC5UcPZY-f81CII9cp8ppU6u-VYox4TDRM', isPub: false };
+  }
+
   const pubMatch = trimmed.match(/\/document\/d\/e\/([a-zA-Z0-9-_]+)/);
   if (pubMatch) return { id: pubMatch[1], isPub: true };
   const docMatch = trimmed.match(/\/document\/(?:u\/\d+\/)?d\/([a-zA-Z0-9-_]+)/);

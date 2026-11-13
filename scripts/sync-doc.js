@@ -2,8 +2,8 @@
  * CLI 腳本：讀取 Google 文件 (形容詞 / 名詞) 並同步至本機詞庫檔案
  * 
  * 預設 Google Docs：
- *   形容詞：https://docs.google.com/document/d/1VroI-PQY44U87PfjPRgaRX0Z-gFDiXgfl4oSPI14b5s/edit?usp=sharing
- *   名詞：  https://docs.google.com/document/d/1RSqBWOGG3jC5UcPZY-f81CII9cp8ppU6u-VYox4TDRM/edit?usp=sharing
+ *   形容詞：https://reurl.cc/omklQg
+ *   名詞：  https://reurl.cc/xe5d94
  * 
  * 執行指令：
  *   npm run sync-doc
@@ -14,8 +14,8 @@
 const fs = require('fs');
 const path = require('path');
 
-const DEFAULT_ADJ_DOC = 'https://docs.google.com/document/d/1VroI-PQY44U87PfjPRgaRX0Z-gFDiXgfl4oSPI14b5s/edit?usp=sharing';
-const DEFAULT_NOUN_DOC = 'https://docs.google.com/document/d/1RSqBWOGG3jC5UcPZY-f81CII9cp8ppU6u-VYox4TDRM/edit?usp=sharing';
+const DEFAULT_ADJ_DOC = 'https://reurl.cc/omklQg';
+const DEFAULT_NOUN_DOC = 'https://reurl.cc/xe5d94';
 
 function parseArgs() {
   const args = process.argv.slice(2);
@@ -39,6 +39,15 @@ function parseArgs() {
 function extractDocInfo(inputUrl) {
   if (!inputUrl) return null;
   const trimmed = inputUrl.trim();
+
+  // 支援短網址對應 (reurl.cc)
+  if (trimmed.includes('reurl.cc/omklQg')) {
+    return { id: '1VroI-PQY44U87PfjPRgaRX0Z-gFDiXgfl4oSPI14b5s', isPub: false };
+  }
+  if (trimmed.includes('reurl.cc/xe5d94')) {
+    return { id: '1RSqBWOGG3jC5UcPZY-f81CII9cp8ppU6u-VYox4TDRM', isPub: false };
+  }
+
   const pubMatch = trimmed.match(/\/document\/d\/e\/([a-zA-Z0-9-_]+)/);
   if (pubMatch) return { id: pubMatch[1], isPub: true };
   const docMatch = trimmed.match(/\/document\/(?:u\/\d+\/)?d\/([a-zA-Z0-9-_]+)/);
