@@ -1,5 +1,5 @@
 /**
- * CLI 腳本：讀取 Google 文件 (形容詞 / 名詞) 並推送到 GitHub
+ * CLI 腳本：讀取 Google 文件 (形容詞 / 名詞) 並同步至本機詞庫檔案
  * 
  * 預設 Google Docs：
  *   形容詞：https://docs.google.com/document/d/1VroI-PQY44U87PfjPRgaRX0Z-gFDiXgfl4oSPI14b5s/edit?usp=sharing
@@ -8,7 +8,7 @@
  * 執行指令：
  *   npm run sync-doc
  * 或指定參數：
- *   node scripts/sync-doc.js --adj "<網址>" --noun "<網址>" --token "<ghp_...>"
+ *   node scripts/sync-doc.js --adj "<網址>" --noun "<網址>"
  */
 
 const fs = require('fs');
@@ -16,8 +16,6 @@ const path = require('path');
 
 const DEFAULT_ADJ_DOC = 'https://docs.google.com/document/d/1VroI-PQY44U87PfjPRgaRX0Z-gFDiXgfl4oSPI14b5s/edit?usp=sharing';
 const DEFAULT_NOUN_DOC = 'https://docs.google.com/document/d/1RSqBWOGG3jC5UcPZY-f81CII9cp8ppU6u-VYox4TDRM/edit?usp=sharing';
-const DEFAULT_REPO = 's411318-abc/auto-question-supply';
-const DEFAULT_BRANCH = 'main';
 
 function parseArgs() {
   const args = process.argv.slice(2);
@@ -105,93 +103,25 @@ function extractWordsFromDocText(text) {
   return words;
 }
 
-async function pushToGitHub({ token, repo, filePath, branch, content, commitMessage }) {
-  const [owner, repoName] = repo.split('/');
-  if (!owner || !repoName) {
-    throw new Error("儲存庫格式需為 '擁有者/專案名'，例如 s411318-abc/auto-question-supply");
-  }
-
-  const cleanPath = filePath.replace(/^\/+/, '');
-  console.log(`🚀 正在推送至 GitHub: ${owner}/${repoName} [路徑: ${cleanPath}] ...`);
-
-  const headers = {
-    'Authorization': `Bearer ${token}`,
-    'Accept': 'application/vnd.github.v3+json',
-    'Content-Type': 'application/json',
-    'User-Agent': 'AutoQuestionSupply-SyncScript'
-  };
-
-  // 1. 檢查檔案是否已存在以取得其 sha
-  let sha = null;
-  const getUrl = `https://api.github.com/repos/${owner}/${repoName}/contents/${encodeURIComponent(cleanPath).replace(/%2F/g, '/')}?ref=${encodeURIComponent(branch)}`;
-  const checkRes = await fetch(getUrl, { headers });
-
-  if (checkRes.ok) {
-    const fileInfo = await checkRes.json();
-    sha = fileInfo.sha;
-  } else if (checkRes.status !== 404) {
-    const errData = await checkRes.json().catch(() => ({}));
-    throw new Error(`查詢現有檔案資訊失敗 (HTTP ${checkRes.status}): ${errData.message || checkRes.statusText}`);
-  }
-
-  // 2. Base64 編碼文字內容
-  const base64Content = Buffer.from(content, 'utf-8').toString('base64');
-
-  // 3. 提交至 GitHub
-  const putUrl = `https://api.github.com/repos/${owner}/${repoName}/contents/${encodeURIComponent(cleanPath).replace(/%2F/g, '/')}`;
-  const body = {
-    message: commitMessage || `docs: 更新 ${cleanPath} (來自 Google 文件同步)`,
-    content: base64Content,
-    branch: branch || 'main'
-  };
-  if (sha) {
-    body.sha = sha;
-  }
-
-  const putRes = await fetch(putUrl, {
-    method: 'PUT',
-    headers,
-    body: JSON.stringify(body)
-  });
-
-  if (!putRes.ok) {
-    const errData = await putRes.json().catch(() => ({}));
-    throw new Error(`GitHub 提交失敗 (HTTP ${putRes.status}): ${errData.message || putRes.statusText}`);
-  }
-
-  return await putRes.json();
-}
-
 async function main() {
   const args = parseArgs();
-
-  const token = args.token || process.env.GITHUB_TOKEN;
-  const repo = args.repo || process.env.GITHUB_REPO || DEFAULT_REPO;
-  const branch = args.branch || process.env.GITHUB_BRANCH || DEFAULT_BRANCH;
 
   const adjUrl = args.adj || process.env.GOOGLE_DOC_ADJ_URL || DEFAULT_ADJ_DOC;
   const nounUrl = args.noun || process.env.GOOGLE_DOC_NOUN_URL || DEFAULT_NOUN_DOC;
   const singleDocUrl = args.doc || process.env.GOOGLE_DOC_URL;
 
   console.log('==================================================');
-  console.log(' 🚀 Auto Question Supply - Google Docs ➔ GitHub 同步');
+  console.log(' 📄 Auto Question Supply - Google Docs 同步');
   console.log('==================================================');
 
   try {
     if (singleDocUrl) {
       // 單一文件模式
       const content = await fetchGoogleDocText(singleDocUrl);
-      const filePath = args.path || 'data/questions.txt';
-      const result = await pushToGitHub({
-        token,
-        repo,
-        filePath,
-        branch,
-        content,
-        commitMessage: args.message || `docs: 更新 ${filePath} (來自 Google 文件)`
-      });
-      console.log(`\n🎉 單一文件推送完成！`);
-      console.log(`🌐 檢視檔案: ${result.content.html_url}`);
+      const filePath = path.resolve(__dirname, '..', args.path || 'data/questions.txt');
+      fs.mkdirSync(path.dirname(filePath), { recursive: true });
+      fs.writeFileSync(filePath, content, 'utf-8');
+      console.log(`\n🎉 單一文件儲存完成！已儲存至: ${filePath}`);
     } else {
       // 雙文件模式 (形容詞 & 名詞)
       console.log(`[1/2] 讀取形容詞文件: ${adjUrl}`);
@@ -204,7 +134,7 @@ async function main() {
       const nounWords = extractWordsFromDocText(nounText);
       console.log(`   ➔ 名詞共讀取 ${nounWords.length} 個詞彙 (原始字元數: ${nounText.length})`);
 
-      // 建立整合 vocabulary.json 與純文字檔
+      // 建立整合 vocabulary.json
       const vocabData = {
         updatedAt: new Date().toISOString(),
         adjectives: adjWords,
@@ -215,20 +145,11 @@ async function main() {
         }
       };
 
-      console.log('\n📦 正在將資料推送到 GitHub...');
-      const vocabResult = await pushToGitHub({
-        token,
-        repo,
-        filePath: 'data/vocabulary.json',
-        branch,
-        content: JSON.stringify(vocabData, null, 2),
-        commitMessage: 'docs: 自動同步 Google 文件形容詞與名詞至 vocabulary.json'
-      });
+      const outputPath = path.resolve(__dirname, '../data/vocabulary.json');
+      fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+      fs.writeFileSync(outputPath, JSON.stringify(vocabData, null, 2), 'utf-8');
 
-      console.log(`   ✅ 已同步 data/vocabulary.json`);
-      console.log(`\n🎉 全部同步完成！`);
-      console.log(`🔗 Commit: ${vocabResult.commit.sha.slice(0, 7)}`);
-      console.log(`🌐 檢視 GitHub 檔案: ${vocabResult.content.html_url}`);
+      console.log(`\n🎉 全部同步完成！已更新本機詞庫: ${outputPath}`);
     }
   } catch (err) {
     console.error(`\n❌ 執行失敗: ${err.message}`);
@@ -242,7 +163,6 @@ if (require.main === module) {
 
 module.exports = {
   fetchGoogleDocText,
-  pushToGitHub,
   extractDocInfo,
   extractWordsFromDocText
 };

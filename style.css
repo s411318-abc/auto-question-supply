@@ -831,7 +831,7 @@ textarea::-webkit-scrollbar-thumb {
   pointer-events: none;
 }
 
-/* Google Docs to GitHub Sync Card */
+/* Google Docs Sync Card */
 .doc-sync-card {
   border-top: 4px solid var(--primary-color);
 }
@@ -948,59 +948,6 @@ textarea::-webkit-scrollbar-thumb {
   flex-wrap: wrap;
 }
 
-.github-config-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.85rem;
-}
-
-.sync-action-bar {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  margin-top: 1.25rem;
-  flex-wrap: wrap;
-}
-
-.sync-status {
-  font-size: 0.9rem;
-  font-weight: 500;
-  color: var(--text-muted);
-}
-
-.push-success-card {
-  margin-top: 1.15rem;
-  background: #ecfdf5;
-  border: 1.5px solid #a7f3d0;
-  border-radius: var(--radius-md);
-  padding: 1.1rem 1.25rem;
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  animation: slideUp 0.3s ease;
-}
-
-.push-success-card .success-icon {
-  font-size: 2rem;
-}
-
-.push-success-card .success-details {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-}
-
-.push-success-card .success-title {
-  color: #065f46;
-  font-weight: 700;
-  font-size: 0.95rem;
-}
-
-.push-success-card .success-sha {
-  font-size: 0.82rem;
-  color: #047857;
-  font-family: monospace;
-}
 
 .toast {
   pointer-events: auto;
@@ -1059,7 +1006,6 @@ textarea::-webkit-scrollbar-thumb {
 
   .input-grid,
   .vocab-grid,
-  .github-config-grid,
   .doc-inputs-grid,
   .preview-grid {
     grid-template-columns: 1fr;

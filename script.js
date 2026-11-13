@@ -58,7 +58,7 @@ const elements = {
   historyList: document.getElementById("historyList"),
   btnClearHistory: document.getElementById("btnClearHistory"),
 
-  // Google Docs & GitHub 同步相關元素
+  // Google Docs 文件讀取相關元素
   adjDocUrl: document.getElementById("adjDocUrl"),
   btnFetchAdjDoc: document.getElementById("btnFetchAdjDoc"),
   fetchAdjIcon: document.getElementById("fetchAdjIcon"),
@@ -76,19 +76,6 @@ const elements = {
   nounDocCharCount: document.getElementById("nounDocCharCount"),
   btnApplyPreviewToVocab: document.getElementById("btnApplyPreviewToVocab"),
   btnClearDocPreview: document.getElementById("btnClearDocPreview"),
-
-  ghRepoInput: document.getElementById("ghRepoInput"),
-  ghPathInput: document.getElementById("ghPathInput"),
-  ghBranchInput: document.getElementById("ghBranchInput"),
-  ghTokenInput: document.getElementById("ghTokenInput"),
-  btnToggleTokenVisibility: document.getElementById("btnToggleTokenVisibility"),
-  ghCommitMsgInput: document.getElementById("ghCommitMsgInput"),
-  btnPushToGitHub: document.getElementById("btnPushToGitHub"),
-  pushIcon: document.getElementById("pushIcon"),
-  syncStatusMessage: document.getElementById("syncStatusMessage"),
-  pushSuccessContainer: document.getElementById("pushSuccessContainer"),
-  pushSuccessCommitInfo: document.getElementById("pushSuccessCommitInfo"),
-  pushSuccessLink: document.getElementById("pushSuccessLink"),
   
   toastContainer: document.getElementById("toastContainer")
 };
@@ -128,18 +115,10 @@ function loadData() {
     cleanDrawnCombos();
     saveData();
 
-    // 載入已儲存的 GitHub 與文件設定
-    const savedGhToken = localStorage.getItem("rw_gh_token");
-    const savedGhRepo = localStorage.getItem("rw_gh_repo");
-    const savedGhPath = localStorage.getItem("rw_gh_path");
-    const savedGhBranch = localStorage.getItem("rw_gh_branch");
+    // 載入已儲存的文件設定
     const savedAdjDocUrl = localStorage.getItem("rw_adj_doc_url");
     const savedNounDocUrl = localStorage.getItem("rw_noun_doc_url");
 
-    if (savedGhToken && elements.ghTokenInput) elements.ghTokenInput.value = savedGhToken;
-    if (savedGhRepo && elements.ghRepoInput) elements.ghRepoInput.value = savedGhRepo;
-    if (savedGhPath && elements.ghPathInput) elements.ghPathInput.value = savedGhPath;
-    if (savedGhBranch && elements.ghBranchInput) elements.ghBranchInput.value = savedGhBranch;
     if (savedAdjDocUrl && elements.adjDocUrl) elements.adjDocUrl.value = savedAdjDocUrl;
     if (savedNounDocUrl && elements.nounDocUrl) elements.nounDocUrl.value = savedNounDocUrl;
   } catch (e) {
@@ -307,7 +286,7 @@ function setupEventListeners() {
     showToast("已清除抽取紀錄", "warning");
   });
 
-  // Google Docs & GitHub 同步事件監聽
+  // Google Docs 文件讀取事件監聽
   if (elements.adjDocUrl) {
     elements.adjDocUrl.addEventListener("change", () => {
       localStorage.setItem("rw_adj_doc_url", elements.adjDocUrl.value.trim());
@@ -338,32 +317,6 @@ function setupEventListeners() {
   }
   if (elements.btnClearDocPreview) {
     elements.btnClearDocPreview.addEventListener("click", handleClearDocPreview);
-  }
-  if (elements.btnToggleTokenVisibility) {
-    elements.btnToggleTokenVisibility.addEventListener("click", handleToggleTokenVisibility);
-  }
-  if (elements.btnPushToGitHub) {
-    elements.btnPushToGitHub.addEventListener("click", handlePushToGitHub);
-  }
-  if (elements.ghRepoInput) {
-    elements.ghRepoInput.addEventListener("change", () => {
-      localStorage.setItem("rw_gh_repo", elements.ghRepoInput.value.trim());
-    });
-  }
-  if (elements.ghPathInput) {
-    elements.ghPathInput.addEventListener("change", () => {
-      localStorage.setItem("rw_gh_path", elements.ghPathInput.value.trim());
-    });
-  }
-  if (elements.ghBranchInput) {
-    elements.ghBranchInput.addEventListener("change", () => {
-      localStorage.setItem("rw_gh_branch", elements.ghBranchInput.value.trim());
-    });
-  }
-  if (elements.ghTokenInput) {
-    elements.ghTokenInput.addEventListener("change", () => {
-      localStorage.setItem("rw_gh_token", elements.ghTokenInput.value.trim());
-    });
   }
 }
 
@@ -836,7 +789,7 @@ function escapeHtml(str) {
 }
 
 /* ========================================================
-   Google 文件讀取與 GitHub 同步功能
+   Google 文件讀取與詞庫更新功能
    ======================================================== */
 
 /**
@@ -1180,156 +1133,5 @@ function handleClearDocPreview() {
   showToast("已清空預覽框內容", "info");
 }
 
-/**
- * 切換 Token 密碼顯示狀態
- */
-function handleToggleTokenVisibility() {
-  if (elements.ghTokenInput.type === "password") {
-    elements.ghTokenInput.type = "text";
-    elements.btnToggleTokenVisibility.textContent = "🙈";
-  } else {
-    elements.ghTokenInput.type = "password";
-    elements.btnToggleTokenVisibility.textContent = "👁️";
-  }
-}
 
-/**
- * 推送資料至 GitHub
- */
-async function handlePushToGitHub() {
-  const repo = elements.ghRepoInput.value.trim();
-  const filePath = elements.ghPathInput.value.trim().replace(/^\/+/, '');
-  const branch = elements.ghBranchInput.value.trim() || "main";
-  const token = elements.ghTokenInput.value.trim();
-  const commitMessage = elements.ghCommitMsgInput.value.trim() || `docs: 更新 ${filePath} (來自 Google 文件同步)`;
-
-  if (!token) {
-    showToast("請輸入 GitHub Personal Access Token (PAT)", "warning");
-    elements.ghTokenInput.focus();
-    return;
-  }
-
-  if (!repo || !repo.includes('/')) {
-    showToast("儲存庫格式需為「擁有者/倉庫名稱」，例如：s411318-abc/auto-question-supply", "warning");
-    elements.ghRepoInput.focus();
-    return;
-  }
-
-  if (!filePath) {
-    showToast("請輸入目標檔案路徑，例如：data/vocabulary.json", "warning");
-    elements.ghPathInput.focus();
-    return;
-  }
-
-  // 儲存設定至 LocalStorage
-  localStorage.setItem("rw_gh_token", token);
-  localStorage.setItem("rw_gh_repo", repo);
-  localStorage.setItem("rw_gh_path", filePath);
-  localStorage.setItem("rw_gh_branch", branch);
-
-  // 決定要推送到 GitHub 的檔案內容
-  let content = "";
-  if (filePath.endsWith('.json')) {
-    const adjWords = extractWordsFromDocText(elements.adjDocPreview.value);
-    const nounWords = extractWordsFromDocText(elements.nounDocPreview.value);
-    
-    // 若預覽框為空，以目前詞庫 state 為主
-    const finalAdjectives = adjWords.length > 0 ? adjWords : state.adjectives;
-    const finalNouns = nounWords.length > 0 ? nounWords : state.nouns;
-
-    const dataObj = {
-      updatedAt: new Date().toISOString(),
-      adjectives: finalAdjectives,
-      nouns: finalNouns,
-      sources: {
-        adjectivesDoc: elements.adjDocUrl.value.trim(),
-        nounsDoc: elements.nounDocUrl.value.trim()
-      }
-    };
-    content = JSON.stringify(dataObj, null, 2);
-  } else {
-    const adjPart = elements.adjDocPreview.value.trim();
-    const nounPart = elements.nounDocPreview.value.trim();
-    if (!adjPart && !nounPart) {
-      content = `# 形容詞清單\n${state.adjectives.join('\n')}\n\n# 名詞清單\n${state.nouns.join('\n')}\n`;
-    } else {
-      content = `# 形容詞\n${adjPart}\n\n# 名詞\n${nounPart}\n`;
-    }
-  }
-
-  elements.btnPushToGitHub.disabled = true;
-  elements.pushIcon.textContent = "⏳";
-  elements.syncStatusMessage.textContent = "正在提交並推送到 GitHub...";
-  elements.pushSuccessContainer.style.display = "none";
-
-  try {
-    const headers = {
-      'Authorization': `Bearer ${token}`,
-      'Accept': 'application/vnd.github.v3+json',
-      'Content-Type': 'application/json'
-    };
-
-    // 1. 查詢現有檔案 SHA
-    let sha = null;
-    const checkUrl = `https://api.github.com/repos/${repo}/contents/${encodeURIComponent(filePath).replace(/%2F/g, '/')}?ref=${encodeURIComponent(branch)}`;
-    const checkRes = await fetch(checkUrl, { headers });
-
-    if (checkRes.ok) {
-      const fileData = await checkRes.json();
-      sha = fileData.sha;
-    } else if (checkRes.status !== 404) {
-      const errData = await checkRes.json().catch(() => ({}));
-      throw new Error(errData.message || `檢查檔案失敗 (HTTP ${checkRes.status})`);
-    }
-
-    // 2. Base64 UTF-8 編碼
-    const utf8Bytes = new TextEncoder().encode(content);
-    let binary = '';
-    for (let i = 0; i < utf8Bytes.byteLength; i++) {
-      binary += String.fromCharCode(utf8Bytes[i]);
-    }
-    const base64Content = btoa(binary);
-
-    // 3. 提交 PUT
-    const putUrl = `https://api.github.com/repos/${repo}/contents/${encodeURIComponent(filePath).replace(/%2F/g, '/')}`;
-    const bodyPayload = {
-      message: commitMessage,
-      content: base64Content,
-      branch: branch
-    };
-    if (sha) {
-      bodyPayload.sha = sha;
-    }
-
-    const putRes = await fetch(putUrl, {
-      method: "PUT",
-      headers,
-      body: JSON.stringify(bodyPayload)
-    });
-
-    if (!putRes.ok) {
-      const errData = await putRes.json().catch(() => ({}));
-      throw new Error(errData.message || `提交失敗 (HTTP ${putRes.status})`);
-    }
-
-    const putResult = await putRes.json();
-    const htmlUrl = putResult.content && putResult.content.html_url
-      ? putResult.content.html_url
-      : `https://github.com/${repo}/blob/${branch}/${filePath}`;
-
-    showToast("🎉 成功推送到 GitHub！", "success");
-    elements.syncStatusMessage.textContent = `推送成功！Commit: ${putResult.commit.sha.slice(0, 7)}`;
-
-    elements.pushSuccessCommitInfo.textContent = `Commit SHA: ${putResult.commit.sha.slice(0, 7)}（${commitMessage}）`;
-    elements.pushSuccessLink.href = htmlUrl;
-    elements.pushSuccessContainer.style.display = "flex";
-  } catch (err) {
-    console.error("Push to GitHub Error:", err);
-    showToast(`推送失敗: ${err.message}`, "error");
-    elements.syncStatusMessage.textContent = `推送失敗: ${err.message}`;
-  } finally {
-    elements.btnPushToGitHub.disabled = false;
-    elements.pushIcon.textContent = "🚀";
-  }
-}
 
